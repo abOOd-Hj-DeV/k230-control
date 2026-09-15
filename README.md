@@ -58,6 +58,13 @@ ninja -C build
 ctest --test-dir build --output-on-failure
 ```
 
+The bridge uses POSIX sockets/processes (it targets the little core's Linux),
+so on Windows build inside **WSL2** (Ubuntu): run the commands above from the
+WSL shell (`cd /mnt/c/...`). A phone can be passed into WSL2 with
+[usbipd-win](https://github.com/dorssel/usbipd-win); the replay/test tools
+need no phone. Do not compile single files with `g++ file.cpp` — CMake wires
+the include paths and libraries.
+
 Cross builds only need `-DK230_TARGET=little|big` plus a toolchain file
 (`-DCMAKE_TOOLCHAIN_FILE=...`); FFmpeg and GoogleTest are not required there.
 
