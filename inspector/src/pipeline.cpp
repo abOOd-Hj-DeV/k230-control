@@ -1,6 +1,7 @@
 #include "k230/inspector/pipeline.hpp"
 
 #include <chrono>
+#include <filesystem>
 
 #include "k230/inspector/frame_dump.hpp"
 #include "k230/log.hpp"
@@ -34,6 +35,16 @@ void InspectorPipeline::run() {
     analyzer_->open();
   }
   K230_LOG_INFO(kTag) << "decoder=" << video_decoder_->name() << " analyzer=" << analyzer_->name();
+  if (!config_.dump_dir.empty() && config_.dump_every > 0) {
+    std::error_code ec;
+    std::filesystem::create_directories(config_.dump_dir, ec);
+    if (ec) {
+      K230_LOG_ERROR(kTag) << "cannot create dump dir " << config_.dump_dir << ": " << ec.message();
+    } else {
+      K230_LOG_INFO(kTag) << "dumping every " << config_.dump_every << " sample(s) to "
+                          << std::filesystem::absolute(config_.dump_dir).string();
+    }
+  }
 
   std::int64_t last_packet_wall = now_us();
   while (!stop_) {
@@ -121,8 +132,10 @@ void InspectorPipeline::emit(SyncedSample&& sample) {
 
   if (!config_.dump_dir.empty() && config_.dump_every > 0 && stats_.samples_analyzed % config_.dump_every == 0) {
     const std::string base = config_.dump_dir + "/sample_" + std::to_string(sample.frame.pts_us);
-    write_ppm(sample.frame, base + ".ppm");
-    if (!sample.audio.empty()) write_wav(sample.audio, sample.sample_rate, sample.channels, base + ".wav");
+    if (!write_ppm(sample.frame, base + ".ppm")) K230_LOG_WARN(kTag) << "cannot write " << base << ".ppm";
+    if (!sample.audio.empty() && !write_wav(sample.audio, sample.sample_rate, sample.channels, base + ".wav")) {
+      K230_LOG_WARN(kTag) << "cannot write " << base << ".wav";
+    }
   }
 
   if (observer_) observer_(sample, scores, verdict);
