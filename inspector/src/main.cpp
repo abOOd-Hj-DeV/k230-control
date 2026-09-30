@@ -98,9 +98,9 @@ int main(int argc, char** argv) {
 
   PipelineConfig cfg;
   cfg.sync.audio_enabled = !cli.has("no-audio");
-  cfg.sync.audio_before_us = cli.get_int("audio-before-ms", 500) * 1000;
-  cfg.sync.audio_after_us = cli.get_int("audio-after-ms", 200) * 1000;
-  cfg.sync.max_wait_us = cli.get_int("max-wait-ms", 400) * 1000;
+  cfg.sync.audio_before_us = cli.get_int("audio-before-ms", 2500) * 1000;
+  cfg.sync.audio_after_us = cli.get_int("audio-after-ms", 500) * 1000;
+  cfg.sync.max_wait_us = cli.get_int("max-wait-ms", 1000) * 1000;
   cfg.policy.warn_threshold = static_cast<float>(cli.get_double("warn", 0.60));
   cfg.policy.block_threshold = static_cast<float>(cli.get_double("block", 0.85));
   cfg.policy.confirm_frames = static_cast<std::uint32_t>(cli.get_int("confirm", 3));

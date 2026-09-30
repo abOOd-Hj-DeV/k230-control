@@ -35,6 +35,7 @@ struct MediaPacket {
   std::int64_t pts_us = kNoPts;  // phone monotonic clock, microseconds
   bool is_config = false;        // SPS/PPS (video) or codec header (audio)
   bool is_key_frame = false;
+  std::uint32_t seq = 0;  // per-stream counter; a gap means packets were dropped
   std::vector<std::uint8_t> data;
 };
 

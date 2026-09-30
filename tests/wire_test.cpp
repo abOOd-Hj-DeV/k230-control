@@ -16,6 +16,7 @@ TEST(Wire, MediaPacketRoundTrip) {
   p.pts_us = 123'456'789'012LL;
   p.is_config = false;
   p.is_key_frame = true;
+  p.seq = 0xdeadbeef;
   p.data = {1, 2, 3, 4, 5};
 
   auto bytes = ipc::encode(p);
@@ -30,6 +31,7 @@ TEST(Wire, MediaPacketRoundTrip) {
   EXPECT_EQ(q.pts_us, 123'456'789'012LL);
   EXPECT_FALSE(q.is_config);
   EXPECT_TRUE(q.is_key_frame);
+  EXPECT_EQ(q.seq, 0xdeadbeefu);
 }
 
 TEST(Wire, ConfigPacketKeepsNoPts) {

@@ -70,7 +70,8 @@ void InspectorPipeline::run() {
   for (auto& s : samples) emit(std::move(s));
   verdicts_->close();
   K230_LOG_INFO(kTag) << "done: packets=" << stats_.packets << " frames=" << stats_.frames_decoded
-                      << " analyzed=" << stats_.samples_analyzed << " escalated=" << stats_.verdicts_escalated;
+                      << " analyzed=" << stats_.samples_analyzed << " escalated=" << stats_.verdicts_escalated
+                      << " video_gaps=" << stats_.video_gaps << " skipped=" << stats_.video_skipped;
 }
 
 void InspectorPipeline::handle(const MediaPacket& packet) {
@@ -84,6 +85,21 @@ void InspectorPipeline::handle(const MediaPacket& packet) {
         return;
       }
       video_open_ = true;
+    }
+    // After a drop the reference chain is broken: P-frames would decode into
+    // garbage, so skip video until the next config/key frame.
+    // Recordings made before seq existed carry seq=0 everywhere; never flag those.
+    if (stats_.video_packets > 1 && packet.seq != 0 && packet.seq != next_video_seq_) {
+      ++stats_.video_gaps;
+      wait_key_frame_ = true;
+    }
+    next_video_seq_ = packet.seq + 1;
+    if (wait_key_frame_) {
+      if (!packet.is_config && !packet.is_key_frame) {
+        ++stats_.video_skipped;
+        return;
+      }
+      wait_key_frame_ = false;
     }
     std::vector<VideoFrame> frames;
     if (!video_decoder_->decode(packet, frames)) {

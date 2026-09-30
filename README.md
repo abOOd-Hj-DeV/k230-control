@@ -97,7 +97,7 @@ The bridge can also run alone: `./build/bridge/k230-bridge --record capture.k230
 
 * **True PTS.** Video and audio packets keep the PTS written by the phone.
   `SyncEngine` aligns a frame with the audio window
-  `[pts - 500 ms, pts + 200 ms]` on that clock; wall time is used only to
+  `[pts - 2500 ms, pts + 500 ms]` (3 s, tunable) on that clock; wall time is used only to
   give up waiting (`max_wait_us`) or under backpressure. Incomplete windows
   are zero-padded and flagged `audio_complete=false`, never silently dropped.
 * **Compressed across cores.** The little core never decodes. H.264 at

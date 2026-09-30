@@ -180,6 +180,8 @@ TEST(EndToEnd, ScrcpyStreamThroughInspector) {
 
   // Big core.
   PipelineConfig cfg;
+  cfg.sync.audio_before_us = 500'000;
+  cfg.sync.audio_after_us = 200'000;
   cfg.policy.confirm_frames = 3;
   cfg.policy.warn_threshold = 0.5f;
   cfg.policy.block_threshold = 0.9f;
@@ -221,4 +223,40 @@ TEST(EndToEnd, ScrcpyStreamThroughInspector) {
   }
   EXPECT_EQ(blocks, 1);
   EXPECT_EQ(pipeline.sync().stats().emitted_incomplete, 0u);
+}
+
+// A lost P-frame must not produce garbage frames: video is skipped until the
+// next key frame (GOP is 10 in the encoder above).
+TEST(EndToEnd, LostPacketSkipsToNextKeyFrame) {
+  Encoded enc;
+  if (!encode(enc)) GTEST_SKIP() << "libx264 encoder not available in this FFmpeg build";
+
+  std::vector<MediaPacket> vpk;
+  ScrcpyDemuxer::Callbacks cb;
+  cb.on_packet = [&vpk](MediaPacket&& p) { vpk.push_back(std::move(p)); };
+  ScrcpyDemuxer video({StreamType::Video, true, false, true}, cb);
+  ASSERT_TRUE(video.feed(build_video_stream(enc))) << video.error();
+  ASSERT_EQ(vpk.size(), static_cast<std::size_t>(kFrames + 1));  // config + frames
+
+  auto queue = std::make_shared<ipc::InProcessQueue<MediaPacket>>(1024, ipc::keep_config_packets);
+  constexpr std::size_t kLostFrame = 3;
+  for (std::size_t i = 0; i < vpk.size(); ++i) {
+    if (i == kLostFrame + 1) continue;  // index 0 is the config packet
+    queue->push(std::move(vpk[i]));
+  }
+  queue->close();
+
+  PipelineConfig cfg;
+  cfg.sync.audio_enabled = false;
+  auto sink = std::make_shared<CollectSink>();
+  std::vector<std::int64_t> pts;
+  InspectorPipeline pipeline(cfg, queue, sink, make_default_video_decoder(), std::make_unique<HeuristicAnalyzer>());
+  pipeline.set_observer([&](const SyncedSample& s, const Scores&, const Verdict&) { pts.push_back(s.frame.pts_us); });
+  pipeline.run();
+
+  EXPECT_EQ(pipeline.stats().video_gaps, 1u);
+  EXPECT_EQ(pipeline.stats().video_skipped, 6u);  // frames 4..9
+  ASSERT_EQ(pts.size(), static_cast<std::size_t>(kFrames - 7));
+  EXPECT_EQ(pts[2], kBasePts + 2 * kFrameUs);
+  EXPECT_EQ(pts[3], kBasePts + 10 * kFrameUs) << "resumes at the next key frame";
 }

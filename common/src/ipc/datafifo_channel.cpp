@@ -20,7 +20,7 @@ void encode_header(const MediaPacket& p, std::uint8_t out[kPacketHeaderSize]) {
   write32be(out + 4, static_cast<std::uint32_t>(p.codec));
   write64be(out + 8, static_cast<std::uint64_t>(p.pts_us));
   write32be(out + 16, static_cast<std::uint32_t>(p.data.size()));
-  write32be(out + 20, 0);
+  write32be(out + 20, p.seq);
 }
 
 std::vector<std::uint8_t> encode(const MediaPacket& p) {
@@ -38,6 +38,7 @@ std::optional<std::uint32_t> decode_header(const std::uint8_t in[kPacketHeaderSi
   out.is_key_frame = (in[2] & 2u) != 0;
   out.codec = static_cast<CodecId>(read32be(in + 4));
   out.pts_us = static_cast<std::int64_t>(read64be(in + 8));
+  out.seq = read32be(in + 20);
   return read32be(in + 16);
 }
 

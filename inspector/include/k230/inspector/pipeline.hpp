@@ -36,6 +36,8 @@ class InspectorPipeline {
     std::uint64_t video_packets = 0;
     std::uint64_t audio_packets = 0;
     std::uint64_t frames_decoded = 0;
+    std::uint64_t video_gaps = 0;     // seq discontinuities (packets lost upstream)
+    std::uint64_t video_skipped = 0;  // packets skipped while waiting for a key frame
     std::uint64_t samples_analyzed = 0;
     std::uint64_t verdicts_escalated = 0;  // Warn or above
   };
@@ -72,6 +74,8 @@ class InspectorPipeline {
   SampleObserver observer_;
   std::atomic<bool> stop_{false};
   bool video_open_ = false;
+  bool wait_key_frame_ = false;
+  std::uint32_t next_video_seq_ = 0;
   bool audio_failed_ = false;
   Stats stats_;
 };

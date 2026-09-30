@@ -24,9 +24,9 @@ namespace k230::inspector {
 // analysis.
 struct SyncConfig {
   bool audio_enabled = true;
-  std::int64_t audio_before_us = 500'000;
-  std::int64_t audio_after_us = 200'000;
-  std::int64_t max_wait_us = 400'000;
+  std::int64_t audio_before_us = 2'500'000;
+  std::int64_t audio_after_us = 500'000;
+  std::int64_t max_wait_us = 1'000'000;
   std::size_t max_pending_frames = 8;
 };
 

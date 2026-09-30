@@ -146,6 +146,7 @@ int main(int argc, char** argv) {
                                << " analyzed=" << st.samples_analyzed << " incomplete=" << ss.emitted_incomplete
                                << " av_lead=" << ss.last_av_lead_us / 1000 << "ms"
                                << " | queue=" << packets->size() << " drops=" << packets->drops()
+                               << " gaps=" << st.video_gaps
                                << " | verdicts sent=" << dispatcher.sent() << " dropped=" << dispatcher.dropped();
     }
   }

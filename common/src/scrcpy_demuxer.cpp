@@ -152,6 +152,7 @@ bool ScrcpyDemuxer::step() {
       pkt.data.assign(cursor(), cursor() + pending_len_);
       consume(pending_len_);
 
+      pkt.seq = static_cast<std::uint32_t>(stats_.packets);
       ++stats_.packets;
       if (pkt.is_config) ++stats_.config_packets;
       if (pkt.is_key_frame) ++stats_.key_frames;
