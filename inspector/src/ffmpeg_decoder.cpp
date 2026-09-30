@@ -53,6 +53,7 @@ struct AvContext {
     frame = av_frame_alloc();
     if (!ctx || !pkt || !frame) return false;
     ctx->flags |= AV_CODEC_FLAG_LOW_DELAY;
+    ctx->pkt_timebase = {1, 1'000'000};
     if (avcodec_open2(ctx, codec, nullptr) < 0) {
       K230_LOG_ERROR(kTag) << "avcodec_open2 failed for " << to_string(id);
       return false;
@@ -99,7 +100,8 @@ class FfmpegVideoDecoder final : public VideoDecoder {
     av_packet_unref(av_.pkt);
     if (ret < 0 && ret != AVERROR(EAGAIN)) {
       K230_LOG_WARN(kTag) << "avcodec_send_packet: " << ret;
-      return true;  // corrupt AU; keep going
+      avcodec_flush_buffers(av_.ctx);
+      return false;
     }
     return receive(out);
   }
@@ -114,7 +116,17 @@ class FfmpegVideoDecoder final : public VideoDecoder {
     for (;;) {
       int ret = avcodec_receive_frame(av_.ctx, av_.frame);
       if (ret == AVERROR(EAGAIN) || ret == AVERROR_EOF) return true;
-      if (ret < 0) return false;
+      if (ret < 0) {
+        avcodec_flush_buffers(av_.ctx);
+        out.clear();
+        return false;
+      }
+      if (av_.frame->decode_error_flags != 0 || (av_.frame->flags & AV_FRAME_FLAG_CORRUPT) != 0) {
+        av_frame_unref(av_.frame);
+        avcodec_flush_buffers(av_.ctx);
+        out.clear();
+        return false;
+      }
       out.push_back(convert(av_.frame));
       av_frame_unref(av_.frame);
     }
@@ -171,6 +183,8 @@ class FfmpegAudioDecoder final : public AudioDecoder {
       fresh.ctx = avcodec_alloc_context3(codec);
       fresh.pkt = av_packet_alloc();
       fresh.frame = av_frame_alloc();
+      if (!fresh.ctx || !fresh.pkt || !fresh.frame) return false;
+      fresh.ctx->pkt_timebase = {1, 1'000'000};
       fresh.ctx->extradata = static_cast<std::uint8_t*>(av_mallocz(packet.data.size() + AV_INPUT_BUFFER_PADDING_SIZE));
       std::memcpy(fresh.ctx->extradata, packet.data.data(), packet.data.size());
       fresh.ctx->extradata_size = static_cast<int>(packet.data.size());
@@ -206,7 +220,7 @@ class FfmpegAudioDecoder final : public AudioDecoder {
 
   static PcmChunk to_pcm(AVFrame* f) {
     PcmChunk c;
-    c.pts_us = f->pts;
+    c.pts_us = f->pts == AV_NOPTS_VALUE ? -1 : f->pts;
     c.sample_rate = static_cast<std::uint32_t>(f->sample_rate);
 #if LIBAVUTIL_VERSION_MAJOR >= 58
     c.channels = static_cast<std::uint16_t>(f->ch_layout.nb_channels);

@@ -8,6 +8,7 @@
 
 #include "k230/inspector/analyzer.hpp"
 #include "k230/inspector/decoder.hpp"
+#include "k230/inspector/frame_dump.hpp"
 #include "k230/inspector/policy.hpp"
 #include "k230/inspector/sync_engine.hpp"
 #include "k230/ipc/channel.hpp"
@@ -17,8 +18,7 @@ namespace k230::inspector {
 struct PipelineConfig {
   SyncConfig sync;
   PolicyConfig policy;
-  std::string dump_dir;         // when set, every `dump_every`-th sample is written as PPM + WAV
-  std::uint32_t dump_every = 0;
+  std::string dump_dir;         // when set, write one PNG per second and one 8-second WAV
   std::int64_t idle_timeout_ms = 0;  // stop when no packet arrives for this long (0 = never)
 };
 
@@ -71,6 +71,7 @@ class InspectorPipeline {
   std::unique_ptr<Analyzer> analyzer_;
   SyncEngine sync_;
   Policy policy_;
+  std::unique_ptr<TestCapture> test_capture_;
   SampleObserver observer_;
   std::atomic<bool> stop_{false};
   bool video_open_ = false;

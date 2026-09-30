@@ -260,3 +260,42 @@ TEST(EndToEnd, LostPacketSkipsToNextKeyFrame) {
   EXPECT_EQ(pts[2], kBasePts + 2 * kFrameUs);
   EXPECT_EQ(pts[3], kBasePts + 10 * kFrameUs) << "resumes at the next key frame";
 }
+
+TEST(EndToEnd, ConfigAfterGapDoesNotResumePredictiveFrames) {
+  Encoded enc;
+  if (!encode(enc)) GTEST_SKIP() << "libx264 encoder not available in this FFmpeg build";
+  std::vector<MediaPacket> packets;
+  ScrcpyDemuxer::Callbacks cb;
+  cb.on_packet = [&packets](MediaPacket&& packet) { packets.push_back(std::move(packet)); };
+  ScrcpyDemuxer demuxer({StreamType::Video, true, false, true}, cb);
+  ASSERT_TRUE(demuxer.feed(build_video_stream(enc)));
+
+  auto queue = std::make_shared<ipc::InProcessQueue<MediaPacket>>(1024, ipc::keep_config_packets);
+  for (std::size_t i = 0; i < packets.size(); ++i) {
+    if (i == 4) continue;  // lose frame 3
+    if (i == 6) {
+      MediaPacket config;
+      config.stream = StreamType::Video;
+      config.codec = CodecId::H264;
+      config.is_config = true;
+      config.seq = packets[i].seq;
+      config.data = enc.config;
+      queue->push(std::move(config));
+    }
+    if (i >= 6) ++packets[i].seq;
+    queue->push(std::move(packets[i]));
+  }
+  queue->close();
+
+  PipelineConfig cfg;
+  cfg.sync.audio_enabled = false;
+  auto sink = std::make_shared<CollectSink>();
+  std::vector<std::int64_t> pts;
+  InspectorPipeline pipeline(cfg, queue, sink, make_default_video_decoder(), std::make_unique<HeuristicAnalyzer>());
+  pipeline.set_observer([&](const SyncedSample& s, const Scores&, const Verdict&) { pts.push_back(s.frame.pts_us); });
+  pipeline.run();
+  EXPECT_EQ(pipeline.stats().video_gaps, 1u);
+  EXPECT_EQ(pipeline.stats().video_skipped, 6u);
+  ASSERT_EQ(pts.size(), static_cast<std::size_t>(kFrames - 7));
+  EXPECT_EQ(pts[3], kBasePts + 10 * kFrameUs);
+}

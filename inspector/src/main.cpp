@@ -77,7 +77,7 @@ void usage() {
       "  --realtime                    pace the replay by PTS instead of as fast as possible\n"
       "  --verdicts ipcmsg|stdout      where verdicts go (default: stdout on PC)\n"
       "  --kmodel PATH                 use the KPU analyzer with this model (K230 only)\n"
-      "  --dump-dir DIR --dump-every N write every N-th synced sample as PPM+WAV\n"
+      "  --dump-dir DIR                one PNG per second + one 8-second WAV, aligned by phone PTS\n"
       "  --no-audio                    ignore audio, release frames immediately\n"
       "  --warn X --block X --confirm N --cooldown-ms N   policy tuning\n"
       "  --audio-before-ms N --audio-after-ms N --max-wait-ms N  sync tuning\n"
@@ -106,7 +106,6 @@ int main(int argc, char** argv) {
   cfg.policy.confirm_frames = static_cast<std::uint32_t>(cli.get_int("confirm", 3));
   cfg.policy.cooldown_us = cli.get_int("cooldown-ms", 5000) * 1000;
   cfg.dump_dir = cli.get("dump-dir", "");
-  cfg.dump_every = static_cast<std::uint32_t>(cli.get_int("dump-every", cfg.dump_dir.empty() ? 0 : 10));
   cfg.idle_timeout_ms = cli.get_int("idle-timeout-ms", 0);
 
   const std::string source_kind = cli.get("source", cli.has("replay") ? "replay" : "datafifo");
@@ -160,6 +159,7 @@ int main(int argc, char** argv) {
 
   pipeline.run();
   g_pipeline = nullptr;
+  g_stop = true;
   if (replay.joinable()) replay.join();
 
   const auto& st = pipeline.stats();
@@ -167,5 +167,5 @@ int main(int argc, char** argv) {
   K230_LOG_INFO("inspector") << "sync: emitted=" << ss.emitted << " incomplete=" << ss.emitted_incomplete
                              << " backpressure=" << ss.emitted_backpressure << " last_av_lead_ms=" << ss.last_av_lead_us / 1000
                              << " | verdicts escalated=" << st.verdicts_escalated;
-  return 0;
+  return st.video_packets > 0 && st.frames_decoded == 0 ? 1 : 0;
 }
