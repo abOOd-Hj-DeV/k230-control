@@ -21,7 +21,9 @@ InspectorPipeline::InspectorPipeline(PipelineConfig config, std::shared_ptr<ipc:
       video_decoder_(std::move(video_decoder)),
       analyzer_(std::move(analyzer)),
       sync_(config_.sync),
-      policy_(config_.policy) {}
+      policy_(config_.policy) {
+  if (!config_.dump_dir.empty()) test_capture_ = std::make_unique<TestCapture>(config_.dump_dir);
+}
 
 std::int64_t InspectorPipeline::now_us() {
   return std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::steady_clock::now().time_since_epoch())
@@ -35,13 +37,13 @@ void InspectorPipeline::run() {
     analyzer_->open();
   }
   K230_LOG_INFO(kTag) << "decoder=" << video_decoder_->name() << " analyzer=" << analyzer_->name();
-  if (!config_.dump_dir.empty() && config_.dump_every > 0) {
+  if (test_capture_) {
     std::error_code ec;
     std::filesystem::create_directories(config_.dump_dir, ec);
     if (ec) {
       K230_LOG_ERROR(kTag) << "cannot create dump dir " << config_.dump_dir << ": " << ec.message();
     } else {
-      K230_LOG_INFO(kTag) << "dumping every " << config_.dump_every << " sample(s) to "
+      K230_LOG_INFO(kTag) << "dumping 8 seconds of audio and one PNG per second to "
                           << std::filesystem::absolute(config_.dump_dir).string();
     }
   }
@@ -68,6 +70,10 @@ void InspectorPipeline::run() {
   std::vector<SyncedSample> samples;
   sync_.flush(samples);
   for (auto& s : samples) emit(std::move(s));
+  if (test_capture_ && !test_capture_->finish()) {
+    K230_LOG_WARN(kTag) << "test capture incomplete: images=" << test_capture_->images_written()
+                         << " audio=" << test_capture_->audio_filled_us() / 1000 << "/8000ms";
+  }
   verdicts_->close();
   K230_LOG_INFO(kTag) << "done: packets=" << stats_.packets << " frames=" << stats_.frames_decoded
                       << " analyzed=" << stats_.samples_analyzed << " escalated=" << stats_.verdicts_escalated
@@ -86,9 +92,6 @@ void InspectorPipeline::handle(const MediaPacket& packet) {
       }
       video_open_ = true;
     }
-    // After a drop the reference chain is broken: P-frames would decode into
-    // garbage, so skip video until the next config/key frame.
-    // Recordings made before seq existed carry seq=0 everywhere; never flag those.
     if (stats_.video_packets > 1 && packet.seq != 0 && packet.seq != next_video_seq_) {
       ++stats_.video_gaps;
       wait_key_frame_ = true;
@@ -99,12 +102,12 @@ void InspectorPipeline::handle(const MediaPacket& packet) {
         ++stats_.video_skipped;
         return;
       }
-      wait_key_frame_ = false;
+      if (packet.is_key_frame) wait_key_frame_ = false;
     }
     std::vector<VideoFrame> frames;
     if (!video_decoder_->decode(packet, frames)) {
-      K230_LOG_ERROR(kTag) << "video decoder failure";
-      stop_ = true;
+      K230_LOG_WARN(kTag) << "video decoder failure; waiting for key frame";
+      wait_key_frame_ = true;
       return;
     }
     const std::int64_t now = now_us();
@@ -131,7 +134,10 @@ void InspectorPipeline::handle(const MediaPacket& packet) {
     audio_failed_ = true;
     return;
   }
-  for (auto& c : chunks) sync_.push_audio(std::move(c));
+  for (auto& c : chunks) {
+    if (test_capture_) test_capture_->push_audio(c);
+    sync_.push_audio(std::move(c));
+  }
 }
 
 void InspectorPipeline::drain(std::int64_t now_wall_us) {
@@ -146,13 +152,7 @@ void InspectorPipeline::emit(SyncedSample&& sample) {
   ++stats_.samples_analyzed;
   if (verdict.action >= Action::Warn) ++stats_.verdicts_escalated;
 
-  if (!config_.dump_dir.empty() && config_.dump_every > 0 && stats_.samples_analyzed % config_.dump_every == 0) {
-    const std::string base = config_.dump_dir + "/sample_" + std::to_string(sample.frame.pts_us);
-    if (!write_ppm(sample.frame, base + ".ppm")) K230_LOG_WARN(kTag) << "cannot write " << base << ".ppm";
-    if (!sample.audio.empty() && !write_wav(sample.audio, sample.sample_rate, sample.channels, base + ".wav")) {
-      K230_LOG_WARN(kTag) << "cannot write " << base << ".wav";
-    }
-  }
+  if (test_capture_) test_capture_->push_frame(sample.frame);
 
   if (observer_) observer_(sample, scores, verdict);
   verdicts_->push(std::move(verdict));

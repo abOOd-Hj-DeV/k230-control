@@ -74,6 +74,35 @@ TEST(SyncEngine, ReleasesIncompleteAfterTimeout) {
   EXPECT_EQ(e.stats().emitted_incomplete, 1u);
 }
 
+TEST(SyncEngine, GapInsideCoveredWindowIsStillIncomplete) {
+  SyncEngine e(cfg());
+  std::vector<SyncedSample> out;
+  e.push_audio(make_pcm(900'000, 20'000, 1234));
+  e.push_audio(make_pcm(1'040'000, 20'000, 1234));
+  e.push_video(make_frame(1'000'000), 0);
+  e.poll(0, out);
+  ASSERT_EQ(out.size(), 1u);
+  EXPECT_FALSE(out[0].audio_complete);
+  EXPECT_EQ(out[0].audio_filled_us, 30'000);
+  EXPECT_EQ(out[0].audio[20 * 48 * 2], 0);
+  EXPECT_EQ(e.stats().emitted_incomplete, 1u);
+}
+
+TEST(SyncEngine, OverlappingChunksCannotHideGap) {
+  SyncEngine e(cfg());
+  std::vector<SyncedSample> out;
+  e.push_audio(make_pcm(900'000, 60'000, 1234));
+  e.push_audio(make_pcm(920'000, 40'000, 2345));
+  e.push_audio(make_pcm(1'040'000, 20'000, 3456));
+  e.push_video(make_frame(1'000'000), 0);
+  e.poll(0, out);
+  ASSERT_EQ(out.size(), 1u);
+  EXPECT_FALSE(out[0].audio_complete);
+  EXPECT_EQ(out[0].audio_filled_us, 70'000);
+  EXPECT_EQ(out[0].audio[30 * 48 * 2], 2345);
+  EXPECT_EQ(out[0].audio[80 * 48 * 2], 0);
+}
+
 TEST(SyncEngine, BackpressureReleasesOldestFrame) {
   SyncEngine e(cfg());
   std::vector<SyncedSample> out;

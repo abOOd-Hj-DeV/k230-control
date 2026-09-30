@@ -52,7 +52,7 @@ void usage() {
       "  --adb PATH --serial S --server-jar PATH\n"
       "  --max-size N --max-fps N --bitrate N --video-codec h264|h265 --audio-codec raw|opus --no-audio\n"
       "  --record FILE                 also save the packet stream for `k230-inspector --replay`\n"
-      "  --dump-dir DIR --dump-every N write synced samples as PPM+WAV\n"
+      "  --dump-dir DIR                one PNG per second + one 8-second WAV, aligned by phone PTS\n"
       "  --warn X --block X --confirm N --cooldown-ms N   policy tuning\n"
       "  --duration SEC --verbose");
 }
@@ -85,7 +85,6 @@ int main(int argc, char** argv) {
   pcfg.policy.confirm_frames = static_cast<std::uint32_t>(cli.get_int("confirm", 3));
   pcfg.policy.cooldown_us = cli.get_int("cooldown-ms", 5000) * 1000;
   pcfg.dump_dir = cli.get("dump-dir", "");
-  pcfg.dump_every = static_cast<std::uint32_t>(cli.get_int("dump-every", pcfg.dump_dir.empty() ? 0 : 10));
 
   auto packets = std::make_shared<ipc::InProcessQueue<MediaPacket>>(128, ipc::keep_config_packets);
   auto verdicts = std::make_shared<ipc::InProcessQueue<Verdict>>(64);

@@ -1,7 +1,7 @@
 // Generates a synthetic .k230rec (H.264 via libx264 + raw PCM) so the
 // inspector can be exercised on a PC without a phone:
 //
-//   k230-make-test-recording out.k230rec [seconds=10] [fps=10]
+//   k230-make-test-recording out.k230rec [seconds=8] [fps=10]
 //   k230-inspector --replay out.k230rec --realtime --verbose
 //
 // The picture alternates every 2 s between a "safe" blue screen and a
@@ -52,7 +52,7 @@ int main(int argc, char** argv) {
     return 2;
   }
   const std::string out_path = argv[1];
-  const int seconds = argc > 2 ? std::atoi(argv[2]) : 10;
+  const int seconds = argc > 2 ? std::atoi(argv[2]) : 8;
   const int fps = argc > 3 ? std::atoi(argv[3]) : 10;
   const std::int64_t frame_us = 1'000'000 / fps;
 

@@ -8,12 +8,35 @@
 
 ```bash
 cmake -S . -B build -G Ninja && ninja -C build && ctest --test-dir build
-./build/tools/k230-make-test-recording demo.k230rec 10
+./build/tools/k230-make-test-recording demo.k230rec
 ./build/inspector/k230-inspector --replay demo.k230rec --realtime --verbose
 ```
 
 المفكّك (demuxer)، المزامنة بالـPTS الحقيقي، السياسة، وتنسيق الحزم بين
-النواتين — كلها نهائية ومختبرة. ما يتبقى هو استبدال الأجزاء الخاصة بالعتاد.
+النواتين مختبرة على الـPC. ما يتبقى هو ربط الأجزاء الخاصة بالعتاد واختبارها على اللوحة.
+
+النواة الصغيرة بنظام Linux تستطيع تشغيل جزء `k230-bridge` وتجميع الحزم المضغوطة،
+أما تحليل الصور في التصميم الحالي فيعمل على النواة الكبيرة عبر `k230-inspector`.
+هذا يتفق مع [دليل SDK الرسمي](https://www.kendryte.com/k230/en/v1.9/01_software/board/K230_SDK_User_Manual.html)
+الذي يضع Linux على الصغيرة وRT-Smart وMPP على الكبيرة. وتذكر
+[ملاحظات SDK](https://www.kendryte.com/k230/en/v2.0/03_other/K230_SDK_Release_Notes.html)
+دعم نقل الفيديو المضغوط من الصغيرة إلى الكبيرة لفكّه هناك.
+
+للتحقق من ABI ومسار بدء التشغيل على RISC-V Linux في QEMU user mode:
+
+```bash
+cmake -S . -B build-rv64 -G Ninja -DK230_TARGET=little -DK230_BUILD_TESTS=OFF \
+  -DCMAKE_SYSTEM_NAME=Linux -DCMAKE_SYSTEM_PROCESSOR=riscv64 \
+  -DCMAKE_CXX_COMPILER=riscv64-linux-gnu-g++
+ninja -C build-rv64
+qemu-riscv64 -L /usr/riscv64-linux-gnu build-rv64/bridge/k230-bridge --help
+```
+
+جرى تشغيل هذا البناء على QEMU مع حد ذاكرة افتراضية 2 GiB. أداة GCC هنا تبني
+لـglibc عام ولا تحل محل toolchain الخاص بالـSDK أو مكتبات Buildroot على اللوحة.
+QEMU user mode لا يحاكي USB/ADB أو DATAFIFO أو MPP/VDEC/KPU، لذلك لا يثبت
+تشغيل الالتقاط وفك الصور على K230. يلزم SDK واللوحة لذلك؛ مسار VDEC الحالي
+غير منفذ خارج SDK ويعيد خطأ صريحاً عند محاولة replay على QEMU.
 
 ## 1. النواة الصغيرة (Linux) — `k230-bridge`
 
@@ -88,7 +111,7 @@ cmake -S . -B build-big -G Ninja -DK230_TARGET=big \
 3. `kd_mpi_vdec_get_frame` يعطي NV12 مع نفس الـPTS → حوّله إلى `VideoFrame`
    (المزامنة تعتمد على هذا الـPTS، لا تستبدله بوقت النظام).
 
-**تحقق:** `--dump-dir /sharefs/dump --dump-every 10` ثم افتح ملفات PPM على الـPC.
+**تحقق:** `--dump-dir /sharefs/dump` ثم افتح ملفات PNG وWAV على الـPC.
 
 ### 2.3 KPU
 
@@ -111,6 +134,6 @@ NSFW MobileNet) بـ nncase إلى `.kmodel` مع كوانتزة uint8، وحم�
 | adb على اللوحة | `adb devices` | `XXXX device` |
 | scrcpy + demux | `k230-bridge --record` ثم replay على PC | إطارات وأحكام |
 | DATAFIFO | `k230-bridge` + `k230-inspector --source datafifo` | `packets=` يتزايد في السجل |
-| VDEC | `--dump-dir` | PPM صحيحة |
+| VDEC | `--dump-dir` | PNG صحيحة، صورة كل ثانية وWAV مدته 8 ثوانٍ |
 | المزامنة | السجل `sync: incomplete=` | قريب من 0 |
 | KPU | `--kmodel x.kmodel` | `analyzer=kpu` في السجل |

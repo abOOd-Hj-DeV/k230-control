@@ -5,6 +5,7 @@ add_executable(k230_tests
   wire_test.cpp
   queue_test.cpp
   pcm_ring_test.cpp
+  frame_dump_test.cpp
   sync_engine_test.cpp
   policy_test.cpp
   adb_test.cpp

@@ -34,7 +34,7 @@ std::vector<std::int16_t> PcmRing::extract(std::int64_t start_us, std::int64_t e
   const std::int64_t total_frames = frames_for(end_us - start_us);
   out.assign(static_cast<std::size_t>(total_frames) * channels_, 0);
 
-  std::int64_t filled_frames = 0;
+  std::vector<bool> covered(static_cast<std::size_t>(total_frames), false);
   for (const auto& c : chunks_) {
     if (c.end_pts_us() <= start_us) continue;
     if (c.pts_us >= end_us) break;
@@ -48,9 +48,10 @@ std::vector<std::int16_t> PcmRing::extract(std::int64_t start_us, std::int64_t e
     std::copy_n(c.samples.begin() + static_cast<std::ptrdiff_t>(src_frame * channels_),
                 static_cast<std::ptrdiff_t>(n * channels_),
                 out.begin() + static_cast<std::ptrdiff_t>(dst_frame * channels_));
-    filled_frames += n;
+    std::fill(covered.begin() + dst_frame, covered.begin() + dst_frame + n, true);
   }
-  if (filled_us) *filled_us = filled_frames * 1'000'000 / sample_rate_;
+  if (filled_us) *filled_us = static_cast<std::int64_t>(std::count(covered.begin(), covered.end(), true)) *
+                              1'000'000 / sample_rate_;
   return out;
 }
 

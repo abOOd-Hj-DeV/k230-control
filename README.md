@@ -71,9 +71,10 @@ Cross builds only need `-DK230_TARGET=little|big` plus a toolchain file
 ## Run without a phone
 
 ```bash
-./build/tools/k230-make-test-recording demo.k230rec 10      # 10 s, alternating safe / skin-tone screens
-./build/inspector/k230-inspector --replay demo.k230rec --realtime --verbose \
-    --dump-dir /tmp/dump --dump-every 10                    # PPM + WAV of synced samples
+./build/tools/k230-make-test-recording demo.k230rec        # 8 s, alternating safe / skin-tone screens
+./build/inspector/k230-inspector --replay demo.k230rec --verbose --dump-dir /tmp/dump
+# /tmp/dump: second_0_pts_<phone PTS>.png .. second_7_*.png
+# and audio_pts_<first video PTS>_8s.wav (48 kHz stereo, 8 s)
 ```
 
 Verdicts are printed as JSON lines (the same format the companion app receives):
@@ -92,6 +93,12 @@ Verdicts are printed as JSON lines (the same format the companion app receives):
 same queues that DATAFIFO/IPCMSG replace on the board. `--record` saves the
 compressed stream so it can be replayed later with `k230-inspector --replay`.
 The bridge can also run alone: `./build/bridge/k230-bridge --record capture.k230rec`.
+For a short live diagnostic capture, use `k230-monitor --dump-dir /tmp/dump
+--duration 9`; the extra second allows the microphone to deliver the full
+8-second interval starting at the first decoded video PTS. File names encode
+the phone PTS; absent audio is zero-filled and logged as an incomplete capture.
+Only the first eight seconds of video are exported (one frame per second);
+normal analysis continues for the entire session.
 
 ## Key design points
 
@@ -100,6 +107,9 @@ The bridge can also run alone: `./build/bridge/k230-bridge --record capture.k230
   `[pts - 2500 ms, pts + 500 ms]` (3 s, tunable) on that clock; wall time is used only to
   give up waiting (`max_wait_us`) or under backpressure. Incomplete windows
   are zero-padded and flagged `audio_complete=false`, never silently dropped.
+  The optional dump is a separate 8-second diagnostic WAV starting at the first
+  frame PTS, alongside PNGs selected by elapsed phone PTS (not packet count).
+  Raw PCM is the default scrcpy audio codec so no lossy audio decoder is needed.
 * **Compressed across cores.** The little core never decodes. H.264 at
   max-size 800 / 10 fps / 2 Mbit/s plus 48 kHz stereo PCM (1.5 Mbit/s) is
   ≈ 3.5 Mbit/s over DATAFIFO, 50–100× less than raw frames.

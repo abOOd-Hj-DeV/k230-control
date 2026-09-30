@@ -73,7 +73,7 @@ class SyncEngine {
     std::int64_t arrival_wall_us;
   };
 
-  SyncedSample release(Pending&& p, bool force);
+  SyncedSample release(Pending&& p);
 
   SyncConfig config_;
   PcmRing ring_;
