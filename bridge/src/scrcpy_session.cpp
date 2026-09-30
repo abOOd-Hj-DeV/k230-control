@@ -49,7 +49,6 @@ std::vector<std::string> ScrcpySession::server_command() const {
       "tunnel_forward=true",
       "send_device_meta=false",
       "send_frame_meta=true",
-      "send_codec_meta=true",
       "send_dummy_byte=true",
       "cleanup=true",
   };
