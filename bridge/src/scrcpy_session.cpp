@@ -21,11 +21,13 @@ ScrcpySession::ScrcpySession(ScrcpyConfig config, AdbController adb, std::shared
 
 ScrcpySession::~ScrcpySession() { stop(); }
 
-std::string ScrcpySession::socket_name() const {
-  char buf[32];
-  std::snprintf(buf, sizeof(buf), "scrcpy_%08x", scid_);
+std::string ScrcpySession::scid_hex() const {
+  char buf[16];
+  std::snprintf(buf, sizeof(buf), "%08x", scid_);
   return buf;
 }
+
+std::string ScrcpySession::socket_name() const { return "scrcpy_" + scid_hex(); }
 
 std::vector<std::string> ScrcpySession::server_command() const {
   // Mirrors what the official client sends (see scrcpy app/src/server.c).
@@ -35,7 +37,7 @@ std::vector<std::string> ScrcpySession::server_command() const {
       "/",
       "com.genymobile.scrcpy.Server",
       config_.server_version,
-      "scid=" + std::to_string(scid_),
+      "scid=" + scid_hex(),
       "log_level=" + config_.log_level,
       "video=true",
       "video_codec=" + config_.video_codec,

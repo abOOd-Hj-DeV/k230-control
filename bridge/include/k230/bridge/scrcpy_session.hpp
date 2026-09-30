@@ -70,6 +70,7 @@ class ScrcpySession {
   // Exposed for tests / documentation.
   std::vector<std::string> server_command() const;
   std::string socket_name() const;
+  std::string scid_hex() const;
 
  private:
   bool connect_video_socket();
