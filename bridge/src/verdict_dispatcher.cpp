@@ -43,7 +43,8 @@ bool VerdictDispatcher::ensure_connected() {
     // adb accepts the TCP connection even when no app is listening on the
     // phone; the companion app must greet us so we can tell the difference.
     std::uint8_t hello = 0;
-    if (socket_.recv_exact(&hello, 1, 500) && hello == 'K') {
+    if (socket_.recv_exact(&hello, 1, 500) && hello == 'K' &&
+        socket_.set_send_timeout(config_.send_timeout_ms)) {
       K230_LOG_INFO(kTag) << "companion app connected";
       return true;
     }

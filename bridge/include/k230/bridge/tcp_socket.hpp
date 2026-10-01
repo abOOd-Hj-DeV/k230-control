@@ -19,6 +19,7 @@ class TcpSocket {
 
   bool connect(const std::string& host, std::uint16_t port, int timeout_ms = 2000);
   bool connected() const { return fd_ >= 0; }
+  bool set_send_timeout(int timeout_ms);
   void close();
 
   // Returns bytes read (>0), 0 on orderly shutdown, -1 on error / timeout.
