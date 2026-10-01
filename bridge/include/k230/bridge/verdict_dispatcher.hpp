@@ -20,6 +20,7 @@ struct CompanionConfig {
   std::string abstract_socket = "k230_companion";
   std::uint16_t local_port = 27185;
   int reconnect_delay_ms = 1000;
+  int send_timeout_ms = 500;
   // Verdicts with action < min_action are logged locally but not sent.
   Action min_action = Action::Warn;
 };

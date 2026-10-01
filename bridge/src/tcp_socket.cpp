@@ -9,6 +9,7 @@
 #include <netinet/tcp.h>
 #include <poll.h>
 #include <sys/socket.h>
+#include <sys/time.h>
 #include <unistd.h>
 
 namespace k230::bridge {
@@ -74,6 +75,12 @@ void TcpSocket::close() {
   }
 }
 
+bool TcpSocket::set_send_timeout(int timeout_ms) {
+  if (fd_ < 0 || timeout_ms <= 0) return false;
+  const timeval timeout{timeout_ms / 1000, (timeout_ms % 1000) * 1000};
+  return ::setsockopt(fd_, SOL_SOCKET, SO_SNDTIMEO, &timeout, sizeof(timeout)) == 0;
+}
+
 void TcpSocket::shutdown() {
   if (fd_ >= 0) ::shutdown(fd_, SHUT_RDWR);
 }
@@ -111,6 +118,7 @@ bool TcpSocket::send_all(const std::uint8_t* buf, std::size_t len) {
       if (errno == EINTR) continue;
       return false;
     }
+    if (n == 0) return false;
     sent += static_cast<std::size_t>(n);
   }
   return true;

@@ -9,6 +9,7 @@ add_executable(k230_tests
   sync_engine_test.cpp
   policy_test.cpp
   adb_test.cpp
+  tcp_socket_test.cpp
   scrcpy_stream_test.cpp
 )
 target_link_libraries(k230_tests PRIVATE k230_bridge k230_inspector GTest::gtest GTest::gtest_main)
