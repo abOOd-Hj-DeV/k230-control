@@ -1,0 +1,23 @@
+# Build
+build/
+build-*/
+cmake-build-*/
+CMakeCache.txt
+CMakeFiles/
+compile_commands.json
+.cache/
+
+# Runtime artefacts
+output/
+*.k230rec
+*.log
+
+# Python tooling
+__pycache__/
+*.pyc
+.venv/
+
+# Editors
+.vscode/
+.idea/
+*.swp

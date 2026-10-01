@@ -1,0 +1,44 @@
+#include <chrono>
+#include <cstdint>
+#include <vector>
+
+#include <arpa/inet.h>
+#include <netinet/in.h>
+#include <sys/socket.h>
+#include <unistd.h>
+
+#include <gtest/gtest.h>
+
+#include "k230/bridge/tcp_socket.hpp"
+
+using namespace k230::bridge;
+
+TEST(TcpSocket, SendReturnsWhenPeerStopsReading) {
+  const int listener = ::socket(AF_INET, SOCK_STREAM, 0);
+  ASSERT_GE(listener, 0);
+  const int receive_buffer = 4096;
+  ASSERT_EQ(::setsockopt(listener, SOL_SOCKET, SO_RCVBUF, &receive_buffer, sizeof(receive_buffer)), 0);
+  sockaddr_in address{};
+  address.sin_family = AF_INET;
+  address.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
+  address.sin_port = 0;
+  ASSERT_EQ(::bind(listener, reinterpret_cast<sockaddr*>(&address), sizeof(address)), 0);
+  ASSERT_EQ(::listen(listener, 1), 0);
+  socklen_t address_size = sizeof(address);
+  ASSERT_EQ(::getsockname(listener, reinterpret_cast<sockaddr*>(&address), &address_size), 0);
+
+  TcpSocket client;
+  ASSERT_TRUE(client.connect("127.0.0.1", ntohs(address.sin_port)));
+  const int peer = ::accept(listener, nullptr, nullptr);
+  ASSERT_GE(peer, 0);
+  ASSERT_TRUE(client.set_send_timeout(100));
+
+  const std::vector<std::uint8_t> payload(16 * 1024 * 1024, 42);
+  const auto started = std::chrono::steady_clock::now();
+  EXPECT_FALSE(client.send_all(payload.data(), payload.size()));
+  EXPECT_LT(std::chrono::steady_clock::now() - started, std::chrono::seconds(5));
+
+  client.close();
+  ::close(peer);
+  ::close(listener);
+}
