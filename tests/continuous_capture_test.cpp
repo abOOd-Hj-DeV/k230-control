@@ -71,7 +71,7 @@ TEST(ContinuousCapture, KeepsTenFpsAndContiguousAudioBeyondEightSeconds) {
   }
   for (int second = 0; second < 13; ++second) {
     const auto start = base + second * 1'000'000;
-    const auto duration = second < 12 ? 1'000'000 : 340'000;
+    const std::int64_t duration = second < 12 ? 1'000'000 : 340'000;
     const auto path = directory / ("audio_pts_" + std::to_string(start) + "_end_" +
                                    std::to_string(start + duration) + ".wav");
     const auto bytes = read_bytes(path);
