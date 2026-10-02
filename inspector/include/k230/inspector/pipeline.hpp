@@ -18,7 +18,7 @@ namespace k230::inspector {
 struct PipelineConfig {
   SyncConfig sync;
   PolicyConfig policy;
-  std::string dump_dir;         // when set, write one PNG per second and one 8-second WAV
+  std::string dump_dir;         // PNGs up to 10 fps and continuous PTS-aligned WAV segments
   std::int64_t idle_timeout_ms = 0;  // stop when no packet arrives for this long (0 = never)
 };
 
@@ -71,7 +71,7 @@ class InspectorPipeline {
   std::unique_ptr<Analyzer> analyzer_;
   SyncEngine sync_;
   Policy policy_;
-  std::unique_ptr<TestCapture> test_capture_;
+  std::unique_ptr<ContinuousCapture> capture_;
   SampleObserver observer_;
   std::atomic<bool> stop_{false};
   bool video_open_ = false;

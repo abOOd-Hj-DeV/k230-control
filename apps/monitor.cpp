@@ -52,7 +52,7 @@ void usage() {
       "  --adb PATH --serial S --server-jar PATH\n"
       "  --max-size N --max-fps N --bitrate N --video-codec h264|h265 --audio-codec raw|opus --no-audio\n"
       "  --record FILE                 also save the packet stream for `k230-inspector --replay`\n"
-      "  --dump-dir DIR                one PNG per second + one 8-second WAV, aligned by phone PTS\n"
+      "  --dump-dir DIR                PNGs up to 10 fps + continuous WAV segments, aligned by phone PTS\n"
       "  --warn X --block X --confirm N --cooldown-ms N   policy tuning\n"
       "  --duration SEC --verbose");
 }

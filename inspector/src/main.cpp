@@ -77,7 +77,7 @@ void usage() {
       "  --realtime                    pace the replay by PTS instead of as fast as possible\n"
       "  --verdicts ipcmsg|stdout      where verdicts go (default: stdout on PC)\n"
       "  --kmodel PATH                 use the KPU analyzer with this model (K230 only)\n"
-      "  --dump-dir DIR                one PNG per second + one 8-second WAV, aligned by phone PTS\n"
+      "  --dump-dir DIR                PNGs up to 10 fps + continuous WAV segments, aligned by phone PTS\n"
       "  --no-audio                    ignore audio, release frames immediately\n"
       "  --warn X --block X --confirm N --cooldown-ms N   policy tuning\n"
       "  --audio-before-ms N --audio-after-ms N --max-wait-ms N  sync tuning\n"

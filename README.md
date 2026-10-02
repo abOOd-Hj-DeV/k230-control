@@ -71,10 +71,10 @@ Cross builds only need `-DK230_TARGET=little|big` plus a toolchain file
 ## Run without a phone
 
 ```bash
-./build/tools/k230-make-test-recording demo.k230rec        # 8 s, alternating safe / skin-tone screens
+./build/tools/k230-make-test-recording demo.k230rec 12 10  # 12 s at 10 fps
 ./build/inspector/k230-inspector --replay demo.k230rec --verbose --dump-dir /tmp/dump
-# /tmp/dump: second_0_pts_<phone PTS>.png .. second_7_*.png
-# and audio_pts_<first video PTS>_8s.wav (48 kHz stereo, 8 s)
+# /tmp/dump: frame_<100ms slot>_pts_<phone PTS>.png
+# and audio_pts_<start PTS>_end_<end PTS>.wav (48 kHz stereo)
 ```
 
 Verdicts are printed as JSON lines (the same format the companion app receives):
@@ -87,18 +87,28 @@ Verdicts are printed as JSON lines (the same format the companion app receives):
 
 1. Enable USB debugging, connect the phone, accept the RSA prompt.
 2. `adb devices` must show `device` (not `unauthorized`).
-3. `./build/apps/k230-monitor --record capture.k230rec --verbose`
+3. `./build/apps/k230-monitor --record capture.k230rec --dump-dir output/capture --verbose`
 
 `k230-monitor` runs the bridge and the inspector in one process, joined by the
 same queues that DATAFIFO/IPCMSG replace on the board. `--record` saves the
 compressed stream so it can be replayed later with `k230-inspector --replay`.
 The bridge can also run alone: `./build/bridge/k230-bridge --record capture.k230rec`.
-For a short live diagnostic capture, use `k230-monitor --dump-dir /tmp/dump
---duration 9`; the extra second allows the microphone to deliver the full
-8-second interval starting at the first decoded video PTS. File names encode
-the phone PTS; absent audio is zero-filled and logged as an incomplete capture.
-Only the first eight seconds of video are exported (one frame per second);
-normal analysis continues for the entire session.
+The default server command requests `max_fps=10`, `audio_source=playback` and
+`audio_dup=true`, retaining playback on the phone while forwarding audio.
+Duplication requires **Android 13+**; applications may opt out of playback
+capture. The C++ pipeline keeps `audio_codec=raw` (PCM) to avoid lossy encoding
+and decoding. There is no fallback to the `output` source that mutes the phone.
+
+Capture runs until stopped (Ctrl+C), or until an explicit `--duration SEC`.
+With `--dump-dir`, PNGs are selected in 100 ms slots using phone PTS throughout
+the session. `max_fps` is a ceiling: a static screen or a slower encoder may
+produce fewer frames. Missing slots are not filled with duplicate images.
+Audio is streamed continuously and exported in consecutive one-second WAV
+segments, with a shorter final segment at shutdown, using a bounded two-second
+PCM history. All names include phone PTS; the first WAV starts at the first
+decoded video PTS. Missing audio is zero-filled and reported as incomplete.
+Without `--dump-dir`, no PNG/WAV files are written; synchronized analysis and
+optional `.k230rec` recording continue for the full session.
 
 ## Key design points
 
@@ -107,8 +117,8 @@ normal analysis continues for the entire session.
   `[pts - 2500 ms, pts + 500 ms]` (3 s, tunable) on that clock; wall time is used only to
   give up waiting (`max_wait_us`) or under backpressure. Incomplete windows
   are zero-padded and flagged `audio_complete=false`, never silently dropped.
-  The optional dump is a separate 8-second diagnostic WAV starting at the first
-  frame PTS, alongside PNGs selected by elapsed phone PTS (not packet count).
+  The optional dump uses the same PTS clock for continuous WAV segments and
+  PNGs selected every 100 ms (not by packet count), without an eight-second cap.
   Raw PCM is the default scrcpy audio codec so no lossy audio decoder is needed.
 * **Compressed across cores.** The little core never decodes. H.264 at
   max-size 800 / 10 fps / 2 Mbit/s plus 48 kHz stereo PCM (1.5 Mbit/s) is

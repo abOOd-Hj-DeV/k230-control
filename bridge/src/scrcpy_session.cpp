@@ -45,6 +45,8 @@ std::vector<std::string> ScrcpySession::server_command() const {
       "max_fps=" + std::to_string(config_.max_fps),
       "video_bit_rate=" + std::to_string(config_.video_bit_rate),
       std::string("audio=") + (config_.audio ? "true" : "false"),
+      "audio_source=playback",
+      "audio_dup=true",
       "audio_codec=" + config_.audio_codec,
       "audio_bit_rate=" + std::to_string(config_.audio_bit_rate),
       "control=false",

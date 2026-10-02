@@ -138,6 +138,71 @@ bool write_wav(const std::vector<std::int16_t>& samples, std::uint32_t sample_ra
   return std::fclose(f) == 0 && ok;
 }
 
+ContinuousCapture::ContinuousCapture(std::string directory, bool audio_enabled)
+    : directory_(std::move(directory)), audio_enabled_(audio_enabled) {}
+
+void ContinuousCapture::push_audio(const PcmChunk& chunk) {
+  if (!audio_enabled_ || chunk.pts_us < 0 || chunk.samples.empty()) return;
+  if (chunk.sample_rate == 0 || chunk.channels == 0 ||
+      (last_audio_end_us_ >= 0 &&
+       (chunk.sample_rate != audio_.sample_rate() || chunk.channels != audio_.channels()))) {
+    failed_ = true;
+    return;
+  }
+  last_audio_end_us_ = std::max(last_audio_end_us_, chunk.end_pts_us());
+  audio_.push(chunk);
+  flush_audio();
+}
+
+void ContinuousCapture::push_frame(const VideoFrame& frame) {
+  if (frame.pts_us < 0) return;
+  if (start_pts_us_ < 0) {
+    start_pts_us_ = frame.pts_us;
+    next_audio_pts_us_ = start_pts_us_;
+    flush_audio();
+  }
+  if (frame.pts_us < start_pts_us_) return;
+  last_frame_end_us_ = std::max(last_frame_end_us_, frame.pts_us + kFrameIntervalUs);
+  const auto slot = (frame.pts_us - start_pts_us_) / kFrameIntervalUs;
+  if (slot < next_frame_slot_) return;
+  next_frame_slot_ = slot + 1;
+  const std::string name = directory_ + "/frame_" + std::to_string(slot) + "_pts_" +
+                           std::to_string(frame.pts_us) + ".png";
+  if (!write_png(frame, name)) failed_ = true;
+  else ++images_written_;
+}
+
+void ContinuousCapture::flush_audio() {
+  if (next_audio_pts_us_ < 0) return;
+  while (last_audio_end_us_ >= next_audio_pts_us_ + kAudioSegmentUs) {
+    write_audio(next_audio_pts_us_ + kAudioSegmentUs);
+  }
+}
+
+void ContinuousCapture::write_audio(std::int64_t end_pts_us) {
+  std::int64_t filled_us = 0;
+  auto samples = audio_.extract(next_audio_pts_us_, end_pts_us, &filled_us);
+  const std::string name = directory_ + "/audio_pts_" + std::to_string(next_audio_pts_us_) +
+                           "_end_" + std::to_string(end_pts_us) + ".wav";
+  if (!write_wav(samples, audio_.sample_rate(), audio_.channels(), name)) failed_ = true;
+  audio_filled_us_ += filled_us;
+  audio_duration_us_ += end_pts_us - next_audio_pts_us_;
+  next_audio_pts_us_ = end_pts_us;
+  audio_.drop_before(next_audio_pts_us_);
+}
+
+bool ContinuousCapture::finish() {
+  if (start_pts_us_ < 0) return false;
+  if (audio_enabled_) {
+    flush_audio();
+    const auto end_pts_us = std::max(last_audio_end_us_, last_frame_end_us_);
+    while (next_audio_pts_us_ < end_pts_us) {
+      write_audio(std::min(next_audio_pts_us_ + kAudioSegmentUs, end_pts_us));
+    }
+  }
+  return !failed_ && audio_filled_us_ == audio_duration_us_;
+}
+
 TestCapture::TestCapture(std::string directory) : directory_(std::move(directory)) {}
 
 void TestCapture::push_audio(const PcmChunk& chunk) {

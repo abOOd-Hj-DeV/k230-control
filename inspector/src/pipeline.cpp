@@ -22,7 +22,9 @@ InspectorPipeline::InspectorPipeline(PipelineConfig config, std::shared_ptr<ipc:
       analyzer_(std::move(analyzer)),
       sync_(config_.sync),
       policy_(config_.policy) {
-  if (!config_.dump_dir.empty()) test_capture_ = std::make_unique<TestCapture>(config_.dump_dir);
+  if (!config_.dump_dir.empty()) {
+    capture_ = std::make_unique<ContinuousCapture>(config_.dump_dir, config_.sync.audio_enabled);
+  }
 }
 
 std::int64_t InspectorPipeline::now_us() {
@@ -37,13 +39,13 @@ void InspectorPipeline::run() {
     analyzer_->open();
   }
   K230_LOG_INFO(kTag) << "decoder=" << video_decoder_->name() << " analyzer=" << analyzer_->name();
-  if (test_capture_) {
+  if (capture_) {
     std::error_code ec;
     std::filesystem::create_directories(config_.dump_dir, ec);
     if (ec) {
       K230_LOG_ERROR(kTag) << "cannot create dump dir " << config_.dump_dir << ": " << ec.message();
     } else {
-      K230_LOG_INFO(kTag) << "dumping 8 seconds of audio and one PNG per second to "
+      K230_LOG_INFO(kTag) << "dumping PNGs up to 10 fps and continuous audio to "
                           << std::filesystem::absolute(config_.dump_dir).string();
     }
   }
@@ -66,13 +68,17 @@ void InspectorPipeline::run() {
 
   std::vector<VideoFrame> frames;
   if (video_open_) video_decoder_->flush(frames);
-  for (auto& f : frames) sync_.push_video(std::move(f), now_us());
+  for (auto& f : frames) {
+    if (capture_) capture_->push_frame(f);
+    sync_.push_video(std::move(f), now_us());
+  }
   std::vector<SyncedSample> samples;
   sync_.flush(samples);
   for (auto& s : samples) emit(std::move(s));
-  if (test_capture_ && !test_capture_->finish()) {
-    K230_LOG_WARN(kTag) << "test capture incomplete: images=" << test_capture_->images_written()
-                         << " audio=" << test_capture_->audio_filled_us() / 1000 << "/8000ms";
+  if (capture_ && !capture_->finish()) {
+    K230_LOG_WARN(kTag) << "capture incomplete: images=" << capture_->images_written()
+                         << " audio=" << capture_->audio_filled_us() / 1000 << "/"
+                         << capture_->audio_duration_us() / 1000 << "ms";
   }
   verdicts_->close();
   K230_LOG_INFO(kTag) << "done: packets=" << stats_.packets << " frames=" << stats_.frames_decoded
@@ -113,6 +119,7 @@ void InspectorPipeline::handle(const MediaPacket& packet) {
     const std::int64_t now = now_us();
     for (auto& f : frames) {
       ++stats_.frames_decoded;
+      if (capture_) capture_->push_frame(f);
       sync_.push_video(std::move(f), now);
     }
     return;
@@ -135,7 +142,7 @@ void InspectorPipeline::handle(const MediaPacket& packet) {
     return;
   }
   for (auto& c : chunks) {
-    if (test_capture_) test_capture_->push_audio(c);
+    if (capture_) capture_->push_audio(c);
     sync_.push_audio(std::move(c));
   }
 }
@@ -151,8 +158,6 @@ void InspectorPipeline::emit(SyncedSample&& sample) {
   Verdict verdict = policy_.evaluate(sample.frame.pts_us, scores);
   ++stats_.samples_analyzed;
   if (verdict.action >= Action::Warn) ++stats_.verdicts_escalated;
-
-  if (test_capture_) test_capture_->push_frame(sample.frame);
 
   if (observer_) observer_(sample, scores, verdict);
   verdicts_->push(std::move(verdict));
