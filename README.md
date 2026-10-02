@@ -93,7 +93,7 @@ adb devices
 ./build/apps/k230-monitor --max-fps 10 \
   --nsfwjs-model models/nsfwjs-mobilenet-v2.onnx --onnx-threads 1 \
   --record output/nsfwjs-phone.k230rec --dump-dir output/nsfwjs-phone \
-  --verbose 2>&1 | tee output/nsfwjs-phone.log
+  --verbose 2>&1 | tee -i output/nsfwjs-phone.log
 ```
 
 **إعادة تحليل تسجيل محفوظ:**
@@ -101,7 +101,7 @@ adb devices
 ```bash
 ./build/inspector/k230-inspector --replay output/nsfwjs-phone.k230rec \
   --nsfwjs-model models/nsfwjs-mobilenet-v2.onnx --verbose \
-  2>&1 | tee output/nsfwjs-replay.log
+  2>&1 | tee -i output/nsfwjs-replay.log
 ```
 
 إذا كانت لديك PNG/WAV فقط، أعد الالتقاط مع `--record` للحصول على `.k230rec`.
