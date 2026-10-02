@@ -28,6 +28,14 @@ struct Scores {
   std::uint32_t analysis_regions = 1;
   std::uint64_t analysis_layout = 0;
   double analysis_ms = 0.0;
+  bool analysis_complete = true;
+  std::uint64_t layout_sequence = 0;
+  std::uint64_t layout_session = 0;
+  std::uint32_t source_region = 0;
+  double frame_ms = 0.0;
+  double preparation_ms = 0.0;
+  double inference_ms = 0.0;
+  double transform_ms = 0.0;
 };
 
 std::string describe_scores(const Scores& scores);

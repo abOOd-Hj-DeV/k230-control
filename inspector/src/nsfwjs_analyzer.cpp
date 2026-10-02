@@ -116,7 +116,7 @@ std::vector<float> nsfwjs_input(const VideoFrame& frame) {
 #ifdef K230_HAS_ONNX
 namespace {
 
-class NsfwjsAnalyzer final : public Analyzer {
+class NsfwjsAnalyzer final : public Analyzer, public RegionAnalyzer {
  public:
   explicit NsfwjsAnalyzer(NsfwjsConfig config) : config_(std::move(config)) {}
 
@@ -165,11 +165,21 @@ class NsfwjsAnalyzer final : public Analyzer {
   }
 
   Scores analyze(const SyncedSample& sample) override {
-    if (!session_) throw std::runtime_error("NSFWJS analyzer is not open");
-    const auto start = std::chrono::steady_clock::now();
     const auto regions = nsfwjs_regions(sample.frame, config_.max_regions);
     const std::uint32_t region_index = next_region_++ % regions.size();
-    auto input = nsfwjs_input(sample.frame, regions[region_index]);
+    auto scores = analyze_region(sample.frame, regions[region_index]);
+    scores.audio_level = HeuristicAnalyzer::rms(sample.audio);
+    scores.analysis_region = region_index;
+    scores.analysis_regions = static_cast<std::uint32_t>(regions.size());
+    scores.analysis_layout = static_cast<std::uint64_t>(sample.frame.width) << 32 | sample.frame.height;
+    return scores;
+  }
+
+  Scores analyze_region(const VideoFrame& frame, const ImageRegion& region) override {
+    if (!session_) throw std::runtime_error("NSFWJS analyzer is not open");
+    const auto start = std::chrono::steady_clock::now();
+    auto input = nsfwjs_input(frame, region);
+    const auto prepared = std::chrono::steady_clock::now();
     const std::array<std::int64_t, 4> shape{1, kSize, kSize, 3};
     auto memory = Ort::MemoryInfo::CreateCpu(OrtArenaAllocator, OrtMemTypeDefault);
     auto tensor = Ort::Value::CreateTensor<float>(memory, input.data(), input.size(), shape.data(), shape.size());
@@ -193,11 +203,9 @@ class NsfwjsAnalyzer final : public Analyzer {
     scores.nsfwjs = NsfwjsScores{probabilities[0], probabilities[1], probabilities[2],
                                probabilities[3], probabilities[4]};
     scores.nudity = std::min(1.0f, scores.nsfwjs->porn + scores.nsfwjs->hentai);
-    scores.audio_level = HeuristicAnalyzer::rms(sample.audio);
-    scores.analysis_region = region_index;
-    scores.analysis_regions = static_cast<std::uint32_t>(regions.size());
-    scores.analysis_layout = static_cast<std::uint64_t>(sample.frame.width) << 32 | sample.frame.height;
     scores.analysis_ms = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - start).count();
+    scores.preparation_ms = std::chrono::duration<double, std::milli>(prepared - start).count();
+    scores.inference_ms = scores.analysis_ms - scores.preparation_ms;
     return scores;
   }
 
@@ -221,6 +229,16 @@ std::unique_ptr<Analyzer> make_nsfwjs_analyzer(const NsfwjsConfig& config) {
 #else
   (void)config;
   K230_LOG_ERROR("nsfwjs") << "rebuild the PC target with -DK230_ENABLE_ONNX=ON and -DONNXRUNTIME_ROOT=...";
+  return nullptr;
+#endif
+}
+
+std::unique_ptr<RegionAnalyzer> make_nsfwjs_region_analyzer(const NsfwjsConfig& config) {
+#ifdef K230_HAS_ONNX
+  return std::make_unique<NsfwjsAnalyzer>(config);
+#else
+  (void)config;
+  K230_LOG_ERROR("nsfwjs") << "ONNX Runtime is required for the visual workers";
   return nullptr;
 #endif
 }

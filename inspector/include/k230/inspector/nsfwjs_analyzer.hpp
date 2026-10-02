@@ -15,12 +15,16 @@ struct NsfwjsConfig {
   std::uint32_t max_regions = 9;
 };
 
-struct NsfwjsRegion {
-  std::uint32_t x = 0;
-  std::uint32_t y = 0;
-  std::uint32_t width = 0;
-  std::uint32_t height = 0;
+using NsfwjsRegion = ImageRegion;
+
+class RegionAnalyzer {
+ public:
+  virtual ~RegionAnalyzer() = default;
+  virtual bool open() = 0;
+  virtual Scores analyze_region(const VideoFrame& frame, const ImageRegion& region) = 0;
 };
+
+std::unique_ptr<RegionAnalyzer> make_nsfwjs_region_analyzer(const NsfwjsConfig& config);
 
 std::vector<NsfwjsRegion> nsfwjs_regions(const VideoFrame& frame, std::uint32_t max_regions);
 std::vector<float> nsfwjs_input(const VideoFrame& frame);

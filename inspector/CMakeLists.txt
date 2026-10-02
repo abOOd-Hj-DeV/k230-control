@@ -9,6 +9,7 @@ set(INSPECTOR_SOURCES
   src/vdec_decoder.cpp
   src/kpu_analyzer.cpp
   src/nsfwjs_analyzer.cpp
+  src/fast_vision.cpp
 )
 
 add_library(k230_inspector STATIC ${INSPECTOR_SOURCES})

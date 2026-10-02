@@ -216,6 +216,45 @@ optional `.k230rec` recording continue for the full session.
 
 ## Companion app contract (to be implemented)
 
+### Mentor accessibility layout (implemented)
+
+Install [Mentor](https://github.com/abOOd-Hj-DeV/mentor-app) and manually enable its
+accessibility service. This is a local layout channel; it does not capture pixels
+or implement the verdict-command channel described below.
+
+```bash
+./build/apps/k230-monitor --nsfwjs-model models/nsfwjs-mobilenet-v2.onnx \
+  --onnx-threads 1 --max-fps 10 --layout \
+  --layout-record output/layout.bin --record output/phone.k230rec --verbose
+./build/tools/k230-layout-dump --replay output/layout.bin
+./build/inspector/k230-inspector --replay output/phone.k230rec \
+  --layout-replay output/layout.bin --nsfwjs-model models/nsfwjs-mobilenet-v2.onnx --realtime
+```
+
+`--layout` forwards `tcp:27186` to `localabstract:k230_layout`. A bounded receiver
+validates length, version, flags, timestamps, sequence, dimensions and node bounds.
+The wire contract is documented in Mentor; `tests/fixtures/layout-kotlin-v1.bin`
+was exported by its actual Kotlin encoder. `layout-android-api35.bin` is the first
+complete message received from its running service on the Android 35 emulator.
+No accessibility text is transmitted.
+
+Decoded frames immediately enter two independent ONNX workers, each with one
+inference thread. Image rectangles from the same frame are scaled from current
+screen coordinates (already rotated), then prepared directly to RGB 224×224.
+Up to eight candidate regions plus a full-frame check are evaluated. Missing or
+partial layouts add overlapping fallback regions. The highest region risk feeds
+one policy observation per PTS; safe regions cannot cancel a dangerous region.
+Only the latest pending frame is kept. Vision does not wait for the audio window.
+Layout age is limited to 250 ms and invalidation barriers prevent reuse across
+scroll/window changes. Accessibility cannot prove pixel coverage, so these results
+remain `analysis_complete=false` and cannot declare the screen Safe.
+
+Logs include layout session/sequence, source region, transform/preparation/inference
+time, frame completion time, layout misses, worker failures, dropped frames,
+video gaps and skipped frames. Timing on the development VM is not a phone or
+K230 performance guarantee. Device PTS alignment, rotation, multiwindow behavior,
+WebView coverage and warning latency still require real-device validation.
+
 The bridge does `adb forward tcp:27185 localabstract:k230_companion`,
 connects, expects one greeting byte `'K'`, then streams the JSON lines above.
 Actions: `log` (never sent), `warn`, `block`, `delete`. The dispatcher drops

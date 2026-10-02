@@ -11,6 +11,10 @@ namespace k230::inspector {
 //   NV12: Y (w*h), interleaved UV (w*h/2)          <- native K230 VDEC output
 enum class PixelFormat : std::uint8_t { I420, NV12 };
 
+struct ImageRegion {
+  std::uint32_t x = 0, y = 0, width = 0, height = 0;
+};
+
 struct VideoFrame {
   std::uint32_t width = 0;
   std::uint32_t height = 0;

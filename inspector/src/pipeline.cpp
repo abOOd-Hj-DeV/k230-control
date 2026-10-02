@@ -35,7 +35,8 @@ std::int64_t InspectorPipeline::now_us() {
 
 bool InspectorPipeline::run() {
   try {
-    if (!analyzer_->open()) {
+    if (vision_ && !vision_->start()) throw std::runtime_error("visual workers failed to open");
+    if (!vision_ && !analyzer_->open()) {
       if (!config_.allow_analyzer_fallback) throw std::runtime_error("requested analyzer failed to open");
       K230_LOG_WARN(kTag) << "analyzer '" << analyzer_->name() << "' failed to open, falling back to heuristic";
       analyzer_ = std::make_unique<HeuristicAnalyzer>();
@@ -45,13 +46,15 @@ bool InspectorPipeline::run() {
     return true;
   } catch (const std::exception& e) {
     K230_LOG_ERROR(kTag) << "pipeline failed: " << e.what();
+    if (vision_) vision_->finish();
     verdicts_->close();
     return false;
   }
 }
 
 void InspectorPipeline::run_loop() {
-  K230_LOG_INFO(kTag) << "decoder=" << video_decoder_->name() << " analyzer=" << analyzer_->name();
+  K230_LOG_INFO(kTag) << "decoder=" << video_decoder_->name()
+                      << " analyzer=" << (vision_ ? "nsfwjs-two-workers" : analyzer_->name());
   if (capture_) {
     std::error_code ec;
     std::filesystem::create_directories(config_.dump_dir, ec);
@@ -82,12 +85,21 @@ void InspectorPipeline::run_loop() {
   std::vector<VideoFrame> frames;
   if (video_open_) video_decoder_->flush(frames);
   for (auto& f : frames) {
+    if (vision_) vision_->submit(f);
     if (capture_) capture_->push_frame(f);
     sync_.push_video(std::move(f), now_us());
   }
   std::vector<SyncedSample> samples;
   sync_.flush(samples);
   for (auto& s : samples) emit(std::move(s));
+  if (vision_) {
+    vision_->finish();
+    const auto& st = vision_->stats();
+    stats_.samples_analyzed = st.analyzed;
+    stats_.verdicts_escalated = st.warnings;
+    K230_LOG_INFO("vision") << "analyzed=" << st.analyzed << " dropped=" << st.dropped
+                            << " layout_misses=" << st.layout_misses << " failures=" << st.failures;
+  }
   if (capture_ && !capture_->finish()) {
     K230_LOG_WARN(kTag) << "capture incomplete: images=" << capture_->images_written()
                          << " audio=" << capture_->audio_filled_us() / 1000 << "/"
@@ -132,6 +144,7 @@ void InspectorPipeline::handle(const MediaPacket& packet) {
     const std::int64_t now = now_us();
     for (auto& f : frames) {
       ++stats_.frames_decoded;
+      if (vision_) vision_->submit(f);
       if (capture_) capture_->push_frame(f);
       sync_.push_video(std::move(f), now);
     }
@@ -167,6 +180,7 @@ void InspectorPipeline::drain(std::int64_t now_wall_us) {
 }
 
 void InspectorPipeline::emit(SyncedSample&& sample) {
+  if (vision_) return;
   const Scores scores = analyzer_->analyze(sample);
   Verdict verdict = policy_.evaluate(sample.frame.pts_us, scores);
   ++stats_.samples_analyzed;
