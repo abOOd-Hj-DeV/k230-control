@@ -11,7 +11,9 @@ std::string describe_scores(const Scores& scores) {
   if (scores.nsfwjs) {
     const auto& nsfw = *scores.nsfwjs;
     out << " Drawing=" << nsfw.drawing << " Hentai=" << nsfw.hentai << " Neutral=" << nsfw.neutral
-        << " Porn=" << nsfw.porn << " Sexy=" << nsfw.sexy << " analysis_ms=" << scores.analysis_ms;
+        << " Porn=" << nsfw.porn << " Sexy=" << nsfw.sexy
+        << " region=" << scores.analysis_region + 1 << "/" << scores.analysis_regions
+        << " analysis_ms=" << scores.analysis_ms;
   }
   return out.str();
 }

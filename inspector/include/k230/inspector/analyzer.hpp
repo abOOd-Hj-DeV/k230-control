@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstdint>
 #include <memory>
 #include <optional>
 #include <string>
@@ -23,6 +24,9 @@ struct Scores {
   float profanity = 0.0f;  // from the audio window
   float audio_level = 0.0f;  // RMS of the window, diagnostic only
   std::optional<NsfwjsScores> nsfwjs;
+  std::uint32_t analysis_region = 0;
+  std::uint32_t analysis_regions = 1;
+  std::uint64_t analysis_layout = 0;
   double analysis_ms = 0.0;
 };
 

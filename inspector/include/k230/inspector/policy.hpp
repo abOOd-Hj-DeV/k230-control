@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstdint>
+#include <unordered_map>
 
 #include "k230/inspector/analyzer.hpp"
 #include "k230/verdict.hpp"
@@ -10,9 +11,9 @@ namespace k230::inspector {
 // Turns per-frame scores into actions, with hysteresis so that a single noisy
 // frame never triggers an intervention on the phone.
 //
-//   score >= block_threshold for `confirm_frames` consecutive frames -> Block
-//   score >= warn_threshold  for `confirm_frames` consecutive frames -> Warn
-//   otherwise                                                        -> Log
+//   score >= block_threshold for `confirm_frames` observations in one region -> Block
+//   score >= warn_threshold  for `confirm_frames` observations in one region -> Warn
+//   otherwise                                                           -> Log
 //
 // After a Block/Warn is issued, the same category stays silent for
 // `cooldown_us` (PTS domain) so the companion app is not flooded.
@@ -35,15 +36,21 @@ class Policy {
   struct Track {
     std::uint32_t warn_streak = 0;
     std::uint32_t block_streak = 0;
+  };
+
+  struct TrackGroup {
+    std::unordered_map<std::uint32_t, Track> regions;
+    std::uint64_t layout = 0;
     std::int64_t silenced_until_us = -1;
   };
 
-  Action step(Track& t, float score, std::int64_t pts_us);
+  Action step(TrackGroup& group, float score, std::int64_t pts_us, std::uint32_t region,
+              std::uint64_t layout);
 
   PolicyConfig config_;
-  Track nudity_;
-  Track violence_;
-  Track profanity_;
+  TrackGroup nudity_;
+  TrackGroup violence_;
+  TrackGroup profanity_;
   std::uint32_t sequence_ = 0;
 };
 

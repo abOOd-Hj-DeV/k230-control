@@ -80,6 +80,7 @@ void usage() {
       "  --kmodel PATH                 use the KPU analyzer with this model (K230 only)\n"
       "  --nsfwjs-model PATH           use NSFWJS MobileNetV2 ONNX (PC, warning-only evaluation)\n"
       "  --onnx-threads N              CPU inference threads (default: 1)\n"
+      "  --nsfwjs-regions N            rotate through up to N screen regions (default: 9)\n"
       "  --dump-dir DIR                PNGs up to 10 fps + continuous WAV segments, aligned by phone PTS\n"
       "  --no-audio                    ignore audio, release frames immediately\n"
       "  --warn X --block X --confirm N --cooldown-ms N   policy tuning\n"
@@ -120,6 +121,7 @@ int main(int argc, char** argv) {
     NsfwjsConfig nsfw;
     nsfw.model_path = cli.get("nsfwjs-model");
     nsfw.threads = static_cast<int>(cli.get_int("onnx-threads", 1));
+    nsfw.max_regions = static_cast<std::uint32_t>(cli.get_int("nsfwjs-regions", 9));
     analyzer = make_nsfwjs_analyzer(nsfw);
     if (!analyzer || !analyzer->open()) return 1;
     cfg.allow_analyzer_fallback = false;

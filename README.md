@@ -92,6 +92,7 @@ ctest --test-dir build --output-on-failure
 adb devices
 ./build/apps/k230-monitor --max-fps 10 \
   --nsfwjs-model models/nsfwjs-mobilenet-v2.onnx --onnx-threads 1 \
+  --nsfwjs-regions 9 \
   --record output/nsfwjs-phone.k230rec --dump-dir output/nsfwjs-phone \
   --verbose 2>&1 | tee -i output/nsfwjs-phone.log
 ```
@@ -117,6 +118,11 @@ adb devices
 `Drawing`, `Hentai`, `Neutral`, `Porn`, `Sexy`، وزمن التحليل `analysis_ms`
 شاملاً تجهيز الصورة. احتفظ بسجل تجربة اللعب لقياس الإنذارات الكاذبة.
 `--onnx-threads` يحدد عدد خيوط الاستدلال؛ نبدأ بخيط واحد ثم نقيس.
+`--nsfwjs-regions` يدوّر التحليل بين الشاشة كاملة ومناطق متداخلة منها من دون
+زيادة عدد مرات تشغيل النموذج لكل إطار. تتبع السياسة تأكيد كل منطقة على حدة.
+عند 10 FPS وتسع مناطق، تعود المنطقة نفسها كل 0.9 ثانية؛ تأكيد ثلاث قراءات
+خطرة قد يحتاج حتى 2.7 ثانية بعد ظهور المحتوى. استخدم `--nsfwjs-regions 1`
+للمقارنة مع تحليل الشاشة كاملة فقط.
 راقب أيضاً `drops` و`video_gaps` أثناء الالتقاط إذا لم يواكب الكمبيوتر 10 FPS.
 
 السياسة التجريبية تستخدم `nudity = Porn + Hentai` مع التأكيد المتتابع ومدة

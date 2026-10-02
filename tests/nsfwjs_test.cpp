@@ -109,6 +109,50 @@ TEST(NsfwjsInput, RejectsEmptyOversizedAndTruncatedFrames) {
   EXPECT_THROW(nsfwjs_input(frame), std::invalid_argument);
 }
 
+TEST(NsfwjsInput, GeneratesOverlappingPortraitRegionsWithinBounds) {
+  VideoFrame frame;
+  frame.width = 358;
+  frame.height = 800;
+  const auto regions = nsfwjs_regions(frame, 9);
+  ASSERT_EQ(regions.size(), 9u);
+  EXPECT_EQ(regions.front().x, 0u);
+  EXPECT_EQ(regions.front().y, 0u);
+  EXPECT_EQ(regions.front().width, 358u);
+  EXPECT_EQ(regions.front().height, 800u);
+  for (std::size_t i = 1; i < regions.size(); ++i) {
+    EXPECT_EQ(regions[i].x, 0u);
+    EXPECT_EQ(regions[i].width, 358u);
+    EXPECT_EQ(regions[i].height, 286u);
+    EXPECT_LE(regions[i].y + regions[i].height, frame.height);
+    if (i > 1) {
+      EXPECT_GT(regions[i].y, regions[i - 1].y);
+    }
+  }
+  EXPECT_EQ(regions[3].y, 147u);
+  EXPECT_EQ(regions.back().y, 514u);
+  EXPECT_EQ(nsfwjs_regions(frame, 1).size(), 1u);
+  EXPECT_EQ(nsfwjs_regions(black_frame(), 9).size(), 1u);
+  EXPECT_THROW(nsfwjs_regions(frame, 0), std::invalid_argument);
+  EXPECT_THROW(nsfwjs_regions(frame, 10), std::invalid_argument);
+}
+
+TEST(NsfwjsInput, RegionResizeUsesRegionCorners) {
+  VideoFrame frame;
+  frame.width = frame.height = 4;
+  frame.data = {
+      16, 16, 16, 16,
+      16, 16, 16, 16,
+      16, 16, 235, 235,
+      16, 16, 235, 235,
+      128, 128, 128, 128,
+      128, 128, 128, 128,
+  };
+  const auto input = nsfwjs_input(frame, NsfwjsRegion{2, 2, 2, 2});
+  ASSERT_EQ(input.size(), 224u * 224u * 3u);
+  for (std::size_t i = 0; i < input.size(); ++i) EXPECT_FLOAT_EQ(input[i], 1.0f);
+  EXPECT_THROW(nsfwjs_input(frame, NsfwjsRegion{3, 3, 2, 2}), std::invalid_argument);
+}
+
 TEST(NsfwjsPipeline, RequestedAnalyzerCannotFallBackToHeuristic) {
   PipelineConfig config;
   config.sync.audio_enabled = false;
@@ -171,6 +215,28 @@ TEST(NsfwjsModel, MissingOrCorruptModelAndInvalidThreadsFailToOpen) {
   config.model_path = K230_TEST_NSFWJS_MODEL;
   config.threads = 0;
   EXPECT_FALSE(make_nsfwjs_analyzer(config)->open());
+  config.threads = 1;
+  config.max_regions = 10;
+  EXPECT_FALSE(make_nsfwjs_analyzer(config)->open());
+}
+
+TEST(NsfwjsModel, RotatesThroughConfiguredScreenRegions) {
+  NsfwjsConfig config;
+  config.model_path = K230_TEST_NSFWJS_MODEL;
+  config.max_regions = 4;
+  auto analyzer = make_nsfwjs_analyzer(config);
+  ASSERT_TRUE(analyzer->open());
+  SyncedSample sample;
+  sample.frame.width = 320;
+  sample.frame.height = 640;
+  sample.frame.data.assign(sample.frame.luma_size() * 3 / 2, 128);
+  std::fill_n(sample.frame.data.begin(), sample.frame.luma_size(), 16);
+  for (std::uint32_t expected = 0; expected < 4; ++expected) {
+    const auto scores = analyzer->analyze(sample);
+    EXPECT_EQ(scores.analysis_region, expected);
+    EXPECT_EQ(scores.analysis_regions, 4u);
+  }
+  EXPECT_EQ(analyzer->analyze(sample).analysis_region, 0u);
 }
 
 TEST(NsfwjsPipeline, PreservesPhonePtsAndTemporalConfirmationWithRealModel) {

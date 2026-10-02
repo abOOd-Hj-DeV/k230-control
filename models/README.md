@@ -30,7 +30,14 @@ SHA-256:
   adds no further quantization. ONNX is approximately 10.3 MB.
 
 `Scores::nsfwjs` retains all five outputs; `nudity = Porn + Hentai` supplies
-the existing temporal policy. `Sexy` is diagnostic during this evaluation.
+the existing temporal policy. The analyzer rotates through the full frame and
+up to eight overlapping strips so content embedded in a tall phone interface
+is not reduced to a small part of the model input. Temporal confirmation is
+tracked independently for each region. `Sexy` is diagnostic during this evaluation.
+Only one inference is run per incoming frame. At 10 FPS with nine regions,
+each region is revisited every 0.9 seconds; three positive observations may
+take up to 2.7 seconds after content appears. Near-square frames and frames
+whose short dimension is below 224 pixels use only the full-frame input.
 NSFWJS mode caps escalations at `Warn`. Violence and profanity remain zero;
 audio RMS is diagnostic. None of these scores is a calibrated guarantee.
 
