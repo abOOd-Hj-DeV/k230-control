@@ -85,7 +85,7 @@ ctest --test-dir build --output-on-failure
 إذا كان `python3` لديك أحدث من 3.12، استخدم Python 3.12 مع `uv`:
 
 ```bash
-curl -LsSf https://astral.sh/uv/install.sh | sh
+curl -LsSf https://astral.sh/uv/0.12.10/install.sh | sh
 "$HOME/.local/bin/uv" run --no-project --python 3.12 \
   tools/setup_onnxruntime.py --output output/onnxruntime-py312
 cmake -S . -B build -G Ninja -DK230_TARGET=pc -DK230_ENABLE_ONNX=ON \
