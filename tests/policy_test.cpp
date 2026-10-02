@@ -40,6 +40,33 @@ TEST(Policy, SingleSpikeDoesNotEscalate) {
   EXPECT_EQ(p.evaluate(400'000, nud(0.99f)).action, Action::Block);  // third consecutive
 }
 
+TEST(Policy, ConfirmsEachScreenRegionIndependently) {
+  Policy p(cfg());
+  auto risky = nud(0.9f);
+  auto safe = nud(0.1f);
+  risky.analysis_layout = safe.analysis_layout = 42;
+  risky.analysis_region = 2;
+  safe.analysis_region = 5;
+  EXPECT_EQ(p.evaluate(0, risky).action, Action::Log);
+  EXPECT_EQ(p.evaluate(100'000, safe).action, Action::Log);
+  EXPECT_EQ(p.evaluate(200'000, risky).action, Action::Log);
+  EXPECT_EQ(p.evaluate(300'000, safe).action, Action::Log);
+  EXPECT_EQ(p.evaluate(400'000, risky).action, Action::Block);
+}
+
+TEST(Policy, LayoutChangeResetsRegionConfirmation) {
+  Policy p(cfg());
+  auto scores = nud(0.9f);
+  scores.analysis_region = 2;
+  scores.analysis_layout = 42;
+  EXPECT_EQ(p.evaluate(0, scores).action, Action::Log);
+  EXPECT_EQ(p.evaluate(100'000, scores).action, Action::Log);
+  scores.analysis_layout = 84;
+  EXPECT_EQ(p.evaluate(200'000, scores).action, Action::Log);
+  EXPECT_EQ(p.evaluate(300'000, scores).action, Action::Log);
+  EXPECT_EQ(p.evaluate(400'000, scores).action, Action::Block);
+}
+
 TEST(Policy, ConsecutiveHighFramesBlockThenCooldown) {
   Policy p(cfg());
   EXPECT_EQ(p.evaluate(0, nud(0.9f)).action, Action::Log);

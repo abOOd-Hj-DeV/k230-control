@@ -13,6 +13,7 @@
 
 #include "k230/cli.hpp"
 #include "k230/inspector/pipeline.hpp"
+#include "k230/inspector/nsfwjs_analyzer.hpp"
 #include "k230/ipc/channel.hpp"
 #include "k230/ipc/datafifo_channel.hpp"
 #include "k230/log.hpp"
@@ -77,6 +78,9 @@ void usage() {
       "  --realtime                    pace the replay by PTS instead of as fast as possible\n"
       "  --verdicts ipcmsg|stdout      where verdicts go (default: stdout on PC)\n"
       "  --kmodel PATH                 use the KPU analyzer with this model (K230 only)\n"
+      "  --nsfwjs-model PATH           use NSFWJS MobileNetV2 ONNX (PC, warning-only evaluation)\n"
+      "  --onnx-threads N              CPU inference threads (default: 1)\n"
+      "  --nsfwjs-regions N            rotate through up to N screen regions (default: 9)\n"
       "  --dump-dir DIR                PNGs up to 10 fps + continuous WAV segments, aligned by phone PTS\n"
       "  --no-audio                    ignore audio, release frames immediately\n"
       "  --warn X --block X --confirm N --cooldown-ms N   policy tuning\n"
@@ -108,6 +112,28 @@ int main(int argc, char** argv) {
   cfg.dump_dir = cli.get("dump-dir", "");
   cfg.idle_timeout_ms = cli.get_int("idle-timeout-ms", 0);
 
+  if (cli.has("kmodel") && cli.has("nsfwjs-model")) {
+    K230_LOG_ERROR("inspector") << "choose either --kmodel or --nsfwjs-model";
+    return 1;
+  }
+  std::unique_ptr<Analyzer> analyzer;
+  if (cli.has("nsfwjs-model")) {
+    NsfwjsConfig nsfw;
+    nsfw.model_path = cli.get("nsfwjs-model");
+    nsfw.threads = static_cast<int>(cli.get_int("onnx-threads", 1));
+    nsfw.max_regions = static_cast<std::uint32_t>(cli.get_int("nsfwjs-regions", 9));
+    analyzer = make_nsfwjs_analyzer(nsfw);
+    if (!analyzer || !analyzer->open()) return 1;
+    cfg.allow_analyzer_fallback = false;
+    cfg.policy.escalated_action = Action::Warn;
+  } else if (cli.has("kmodel")) {
+    KpuConfig kpu;
+    kpu.kmodel_path = cli.get("kmodel");
+    analyzer = make_kpu_analyzer(kpu);
+  } else {
+    analyzer = std::make_unique<HeuristicAnalyzer>();
+  }
+
   const std::string source_kind = cli.get("source", cli.has("replay") ? "replay" : "datafifo");
   const std::string verdict_kind = cli.get("verdicts", source_kind == "replay" ? "stdout" : "ipcmsg");
 
@@ -134,15 +160,6 @@ int main(int argc, char** argv) {
     return 1;
   }
 
-  std::unique_ptr<Analyzer> analyzer;
-  if (cli.has("kmodel")) {
-    KpuConfig kpu;
-    kpu.kmodel_path = cli.get("kmodel");
-    analyzer = make_kpu_analyzer(kpu);
-  } else {
-    analyzer = std::make_unique<HeuristicAnalyzer>();
-  }
-
   InspectorPipeline pipeline(cfg, source, verdicts, make_default_video_decoder(), std::move(analyzer));
   g_pipeline = &pipeline;
   std::signal(SIGINT, on_signal);
@@ -152,12 +169,12 @@ int main(int argc, char** argv) {
     if (v.action >= Action::Warn || log::threshold() <= log::Level::Debug) {
       K230_LOG_INFO("sample") << "pts=" << s.frame.pts_us << " " << s.frame.width << "x" << s.frame.height
                               << " audio=" << s.audio_filled_us / 1000 << "/" << (s.audio_end_us - s.audio_start_us) / 1000
-                              << "ms" << (s.audio_complete ? "" : " (incomplete)") << " nudity=" << scores.nudity
-                              << " rms=" << scores.audio_level << " -> " << to_string(v.action);
+                              << "ms" << (s.audio_complete ? "" : " (incomplete)") << " " << describe_scores(scores)
+                              << " -> " << to_string(v.action);
     }
   });
 
-  pipeline.run();
+  const bool ok = pipeline.run();
   g_pipeline = nullptr;
   g_stop = true;
   if (replay.joinable()) replay.join();
@@ -167,5 +184,5 @@ int main(int argc, char** argv) {
   K230_LOG_INFO("inspector") << "sync: emitted=" << ss.emitted << " incomplete=" << ss.emitted_incomplete
                              << " backpressure=" << ss.emitted_backpressure << " last_av_lead_ms=" << ss.last_av_lead_us / 1000
                              << " | verdicts escalated=" << st.verdicts_escalated;
-  return st.video_packets > 0 && st.frames_decoded == 0 ? 1 : 0;
+  return !ok || (st.video_packets > 0 && st.frames_decoded == 0) ? 1 : 0;
 }

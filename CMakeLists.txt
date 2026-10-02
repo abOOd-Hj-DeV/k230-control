@@ -17,6 +17,12 @@ set(K230_TARGET "pc" CACHE STRING "Deployment target: pc | little | big")
 set_property(CACHE K230_TARGET PROPERTY STRINGS pc little big)
 
 option(K230_BUILD_TESTS "Build unit tests" ON)
+option(K230_ENABLE_ONNX "Enable the PC NSFWJS analyzer using ONNX Runtime" OFF)
+set(ONNXRUNTIME_ROOT "" CACHE PATH "ONNX Runtime C++ SDK prefix (include/ and lib/)")
+
+if(K230_ENABLE_ONNX AND NOT K230_TARGET STREQUAL "pc")
+  message(FATAL_ERROR "ONNX Runtime is a PC evaluation backend; K230 uses nncase/KPU")
+endif()
 
 add_compile_options(-Wall -Wextra -Wpedantic)
 

@@ -2,6 +2,7 @@
 
 #include <chrono>
 #include <filesystem>
+#include <stdexcept>
 
 #include "k230/inspector/frame_dump.hpp"
 #include "k230/log.hpp"
@@ -32,12 +33,24 @@ std::int64_t InspectorPipeline::now_us() {
       .count();
 }
 
-void InspectorPipeline::run() {
-  if (!analyzer_->open()) {
-    K230_LOG_WARN(kTag) << "analyzer '" << analyzer_->name() << "' failed to open, falling back to heuristic";
-    analyzer_ = std::make_unique<HeuristicAnalyzer>();
-    analyzer_->open();
+bool InspectorPipeline::run() {
+  try {
+    if (!analyzer_->open()) {
+      if (!config_.allow_analyzer_fallback) throw std::runtime_error("requested analyzer failed to open");
+      K230_LOG_WARN(kTag) << "analyzer '" << analyzer_->name() << "' failed to open, falling back to heuristic";
+      analyzer_ = std::make_unique<HeuristicAnalyzer>();
+      analyzer_->open();
+    }
+    run_loop();
+    return true;
+  } catch (const std::exception& e) {
+    K230_LOG_ERROR(kTag) << "pipeline failed: " << e.what();
+    verdicts_->close();
+    return false;
   }
+}
+
+void InspectorPipeline::run_loop() {
   K230_LOG_INFO(kTag) << "decoder=" << video_decoder_->name() << " analyzer=" << analyzer_->name();
   if (capture_) {
     std::error_code ec;

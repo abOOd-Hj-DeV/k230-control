@@ -1,8 +1,22 @@
 #include "k230/inspector/analyzer.hpp"
 
 #include <cmath>
+#include <sstream>
 
 namespace k230::inspector {
+
+std::string describe_scores(const Scores& scores) {
+  std::ostringstream out;
+  out << "nudity=" << scores.nudity << " rms=" << scores.audio_level;
+  if (scores.nsfwjs) {
+    const auto& nsfw = *scores.nsfwjs;
+    out << " Drawing=" << nsfw.drawing << " Hentai=" << nsfw.hentai << " Neutral=" << nsfw.neutral
+        << " Porn=" << nsfw.porn << " Sexy=" << nsfw.sexy
+        << " region=" << scores.analysis_region + 1 << "/" << scores.analysis_regions
+        << " analysis_ms=" << scores.analysis_ms;
+  }
+  return out.str();
+}
 
 float HeuristicAnalyzer::skin_ratio(const VideoFrame& frame) {
   if (frame.width < 2 || frame.height < 2 || frame.data.size() < frame.luma_size() * 3 / 2) return 0.0f;

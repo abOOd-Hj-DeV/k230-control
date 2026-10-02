@@ -18,6 +18,7 @@ namespace k230::inspector {
 struct PipelineConfig {
   SyncConfig sync;
   PolicyConfig policy;
+  bool allow_analyzer_fallback = true;
   std::string dump_dir;         // PNGs up to 10 fps and continuous PTS-aligned WAV segments
   std::int64_t idle_timeout_ms = 0;  // stop when no packet arrives for this long (0 = never)
 };
@@ -51,13 +52,14 @@ class InspectorPipeline {
   void set_observer(SampleObserver observer) { observer_ = std::move(observer); }
 
   // Blocks until the source is closed and drained, or request_stop() is called.
-  void run();
+  bool run();
   void request_stop() { stop_ = true; }
 
   const Stats& stats() const { return stats_; }
   const SyncEngine& sync() const { return sync_; }
 
  private:
+  void run_loop();
   void handle(const MediaPacket& packet);
   void drain(std::int64_t now_wall_us);
   void emit(SyncedSample&& sample);
