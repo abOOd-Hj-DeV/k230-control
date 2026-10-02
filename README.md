@@ -82,6 +82,17 @@ cmake --build build
 ctest --test-dir build --output-on-failure
 ```
 
+إذا كان `python3` لديك أحدث من 3.12، استخدم Python 3.12 مع `uv`:
+
+```bash
+curl -LsSf https://astral.sh/uv/install.sh | sh
+"$HOME/.local/bin/uv" run --no-project --python 3.12 \
+  tools/setup_onnxruntime.py --output output/onnxruntime-py312
+cmake -S . -B build -G Ninja -DK230_TARGET=pc -DK230_ENABLE_ONNX=ON \
+  -DONNXRUNTIME_ROOT="$PWD/output/onnxruntime-py312"
+cmake --build build
+```
+
 السكربت يثبت ONNX Runtime 1.22.1 في بيئة معزولة ويجهز المكتبة وترويسات C++.
 يحتاج الإنترنت للتثبيت فقط؛ تحليل الصور والصوت محلي. يمكن استخدام SDK رسمي
 موجود لديك بتحديد `ONNXRUNTIME_ROOT` بدلاً من السكربت.
