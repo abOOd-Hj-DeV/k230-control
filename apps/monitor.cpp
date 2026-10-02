@@ -21,6 +21,7 @@
 #include "k230/bridge/verdict_dispatcher.hpp"
 #include "k230/cli.hpp"
 #include "k230/inspector/pipeline.hpp"
+#include "k230/inspector/nsfwjs_analyzer.hpp"
 #include "k230/ipc/channel.hpp"
 #include "k230/log.hpp"
 #include "k230/recording.hpp"
@@ -53,6 +54,8 @@ void usage() {
       "  --max-size N --max-fps N --bitrate N --video-codec h264|h265 --audio-codec raw|opus --no-audio\n"
       "  --record FILE                 also save the packet stream for `k230-inspector --replay`\n"
       "  --dump-dir DIR                PNGs up to 10 fps + continuous WAV segments, aligned by phone PTS\n"
+      "  --nsfwjs-model PATH           use NSFWJS MobileNetV2 ONNX (PC, warning-only evaluation)\n"
+      "  --onnx-threads N              CPU inference threads (default: 1)\n"
       "  --warn X --block X --confirm N --cooldown-ms N   policy tuning\n"
       "  --duration SEC --verbose");
 }
@@ -86,6 +89,19 @@ int main(int argc, char** argv) {
   pcfg.policy.cooldown_us = cli.get_int("cooldown-ms", 5000) * 1000;
   pcfg.dump_dir = cli.get("dump-dir", "");
 
+  std::unique_ptr<inspector::Analyzer> analyzer;
+  if (cli.has("nsfwjs-model")) {
+    inspector::NsfwjsConfig nsfw;
+    nsfw.model_path = cli.get("nsfwjs-model");
+    nsfw.threads = static_cast<int>(cli.get_int("onnx-threads", 1));
+    analyzer = inspector::make_nsfwjs_analyzer(nsfw);
+    if (!analyzer || !analyzer->open()) return 1;
+    pcfg.allow_analyzer_fallback = false;
+    pcfg.policy.escalated_action = Action::Warn;
+  } else {
+    analyzer = std::make_unique<inspector::HeuristicAnalyzer>();
+  }
+
   auto packets = std::make_shared<ipc::InProcessQueue<MediaPacket>>(128, ipc::keep_config_packets);
   auto verdicts = std::make_shared<ipc::InProcessQueue<Verdict>>(64);
 
@@ -109,15 +125,20 @@ int main(int argc, char** argv) {
   if (!session.start()) return 1;
 
   inspector::InspectorPipeline pipeline(pcfg, packets, verdicts, inspector::make_default_video_decoder(),
-                                        std::make_unique<inspector::HeuristicAnalyzer>());
+                                        std::move(analyzer));
   pipeline.set_observer([](const inspector::SyncedSample& s, const inspector::Scores& sc, const Verdict& v) {
     if (v.action >= Action::Warn || log::threshold() <= log::Level::Debug) {
       K230_LOG_INFO("sample") << "pts=" << s.frame.pts_us << " audio=" << s.audio_filled_us / 1000 << "ms"
-                              << (s.audio_complete ? "" : " (incomplete)") << " nudity=" << sc.nudity
-                              << " rms=" << sc.audio_level << " -> " << to_string(v.action);
+                              << (s.audio_complete ? "" : " (incomplete)") << " " << inspector::describe_scores(sc)
+                              << " -> " << to_string(v.action);
     }
   });
-  std::thread inspector_thread([&] { pipeline.run(); });
+  std::atomic<bool> inspector_done{false};
+  bool inspector_ok = false;
+  std::thread inspector_thread([&] {
+    inspector_ok = pipeline.run();
+    inspector_done = true;
+  });
 
   bridge::VerdictDispatcher dispatcher(bridge::CompanionConfig{}, adb, session.device_serial(), verdicts);
   dispatcher.set_observer([](const Verdict& v) {
@@ -131,7 +152,7 @@ int main(int argc, char** argv) {
   const long duration = cli.get_int("duration", 0);
   const auto t0 = std::chrono::steady_clock::now();
   auto next_report = t0 + std::chrono::seconds(5);
-  while (!g_stop && session.running()) {
+  while (!g_stop && session.running() && !inspector_done) {
     std::this_thread::sleep_for(std::chrono::milliseconds(100));
     const auto now = std::chrono::steady_clock::now();
     if (duration > 0 && now - t0 >= std::chrono::seconds(duration)) break;
@@ -155,5 +176,5 @@ int main(int argc, char** argv) {
   inspector_thread.join();
   dispatcher.stop();
   K230_LOG_INFO("monitor") << "stopped";
-  return 0;
+  return inspector_ok ? 0 : 1;
 }

@@ -1,11 +1,20 @@
 #pragma once
 
 #include <memory>
+#include <optional>
 #include <string>
 
 #include "k230/inspector/sync_engine.hpp"
 
 namespace k230::inspector {
+
+struct NsfwjsScores {
+  float drawing = 0.0f;
+  float hentai = 0.0f;
+  float neutral = 0.0f;
+  float porn = 0.0f;
+  float sexy = 0.0f;
+};
 
 // Per-sample scores in [0, 1]. Produced by the model, consumed by Policy.
 struct Scores {
@@ -13,7 +22,11 @@ struct Scores {
   float violence = 0.0f;
   float profanity = 0.0f;  // from the audio window
   float audio_level = 0.0f;  // RMS of the window, diagnostic only
+  std::optional<NsfwjsScores> nsfwjs;
+  double analysis_ms = 0.0;
 };
+
+std::string describe_scores(const Scores& scores);
 
 class Analyzer {
  public:

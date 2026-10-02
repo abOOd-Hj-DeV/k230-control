@@ -24,7 +24,7 @@ Everything is C++17. The same sources build for three targets:
 
 | `K230_TARGET` | builds                                   | decoder | analyzer  | transport         |
 |---------------|------------------------------------------|---------|-----------|-------------------|
-| `pc` (default)| bridge + inspector + `k230-monitor` + tests | FFmpeg  | heuristic | in-process queues |
+| `pc` (default)| bridge + inspector + `k230-monitor` + tests | FFmpeg  | heuristic / NSFWJS ONNX | in-process queues |
 | `little`      | `k230-bridge` only                       | –       | –         | DATAFIFO / IPCMSG |
 | `big`         | `k230-inspector` only                    | VDEC    | KPU       | DATAFIFO / IPCMSG |
 
@@ -45,7 +45,8 @@ bridge/     little core: adb, scrcpy server lifecycle, socket readers, verdict �
 inspector/  big core: decoders, PcmRing, SyncEngine, Analyzer, Policy, pipeline
 apps/       k230-monitor: both halves in one PC process (phone over USB)
 tools/      k230-make-test-recording: synthetic H.264+PCM capture, no phone needed
-tests/      GoogleTest (38 tests incl. an end-to-end scrcpy-bytes → verdict run)
+tests/      GoogleTest, including scrcpy-bytes → verdict and NSFWJS inference checks
+models/     pinned NSFWJS MobileNetV2 ONNX weights and upstream MIT license
 assets/     scrcpy-server 4.0 (pushed to the phone)
 ```
 
@@ -67,6 +68,71 @@ the include paths and libraries.
 
 Cross builds only need `-DK230_TARGET=little|big` plus a toolchain file
 (`-DCMAKE_TOOLCHAIN_FILE=...`); FFmpeg and GoogleTest are not required there.
+
+## تجربة NSFWJS على PC / WSL
+
+الأوزان المحوّلة موجودة في المستودع؛ لا تحتاج إلى TensorFlow أو JavaScript
+لتشغيل المصنّف. نفّذ من جذر مشروع C++ داخل Linux أو WSL (Python 3.10–3.12):
+
+```bash
+python3 tools/setup_onnxruntime.py
+cmake -S . -B build -G Ninja -DK230_TARGET=pc \
+  -DK230_ENABLE_ONNX=ON -DONNXRUNTIME_ROOT="$PWD/output/onnxruntime"
+cmake --build build
+ctest --test-dir build --output-on-failure
+```
+
+السكربت يثبت ONNX Runtime 1.22.1 في بيئة معزولة ويجهز المكتبة وترويسات C++.
+يحتاج الإنترنت للتثبيت فقط؛ تحليل الصور والصوت محلي. يمكن استخدام SDK رسمي
+موجود لديك بتحديد `ONNXRUNTIME_ROOT` بدلاً من السكربت.
+
+**التجربة المباشرة على الهاتف:**
+
+```bash
+adb devices
+./build/apps/k230-monitor --max-fps 10 \
+  --nsfwjs-model models/nsfwjs-mobilenet-v2.onnx --onnx-threads 1 \
+  --record output/nsfwjs-phone.k230rec --dump-dir output/nsfwjs-phone \
+  --verbose 2>&1 | tee output/nsfwjs-phone.log
+```
+
+**إعادة تحليل تسجيل محفوظ:**
+
+```bash
+./build/inspector/k230-inspector --replay output/nsfwjs-phone.k230rec \
+  --nsfwjs-model models/nsfwjs-mobilenet-v2.onnx --verbose \
+  2>&1 | tee output/nsfwjs-replay.log
+```
+
+إذا كانت لديك PNG/WAV فقط، أعد الالتقاط مع `--record` للحصول على `.k230rec`.
+ولتجربة التشغيل دون هاتف:
+
+```bash
+./build/tools/k230-make-test-recording output/nsfwjs-demo.k230rec 12 10
+./build/inspector/k230-inspector --replay output/nsfwjs-demo.k230rec \
+  --nsfwjs-model models/nsfwjs-mobilenet-v2.onnx --verbose
+```
+
+يعرض كل سطر `sample` توقيت الهاتف `pts` ودرجات الفئات الخمس:
+`Drawing`, `Hentai`, `Neutral`, `Porn`, `Sexy`، وزمن التحليل `analysis_ms`
+شاملاً تجهيز الصورة. احتفظ بسجل تجربة اللعب لقياس الإنذارات الكاذبة.
+`--onnx-threads` يحدد عدد خيوط الاستدلال؛ نبدأ بخيط واحد ثم نقيس.
+راقب أيضاً `drops` و`video_gaps` أثناء الالتقاط إذا لم يواكب الكمبيوتر 10 FPS.
+
+السياسة التجريبية تستخدم `nudity = Porn + Hentai` مع التأكيد المتتابع ومدة
+تهدئة التنبيهات الحاليين. درجة `Sexy` مستقلة في السجل ولا تدخل في التصعيد
+حالياً، حتى نقيّم صور الرياضة والسباحة. عند اختيار NSFWJS تُرسل تنبيهات
+`warn` فقط، حتى لو تجاوزت الدرجة حد `--block`؛ تقييم الحظر يأتي لاحقاً.
+`log`/`safe` في بروتوكول القرار يعني عدم تجاوز هذه السياسة، ولا يضمن ملاءمة
+المشهد للأطفال. المصنّف لا يقيس الدماء أو سلامة النص، ولا يحلل الصوت؛
+المزامنة والتسجيل الصوتي وقياس RMS يستمران.
+
+يجب أن يظهر `analyzer=nsfwjs-mobilenet-v2-onnx`. غياب الأوزان أو عدم توافقها
+ينهي التشغيل بخطأ، ولا يستبدل المصنّف بالمحلل التجريبي. بدون
+`--nsfwjs-model` يبقى المحلل التجريبي الحالي. تفاصيل مصدر الأوزان والتحويل
+ومقارنة النتائج في [models/README.md](models/README.md).
+
+هذا تشغيل CPU على PC؛ تحويل nncase إلى `.kmodel` وقياس K230 لم يُنفّذا بعد.
 
 ## Run without a phone
 
@@ -142,6 +208,7 @@ media path.
 ## Status
 
 - [x] Phase 0 — C++17 restructure, correct demuxing, PTS sync, tests (PC)
+- [x] PC evaluation — NSFWJS MobileNetV2 through ONNX Runtime, five-class diagnostics
 - [ ] Phase 1 — little core: buildroot with `android-tools`, `k230-bridge`, USB host validation
 - [ ] Phase 2 — big core: DATAFIFO/IPCMSG, VDEC, `k230-inspector` on RT-Smart
 - [ ] Phase 3 — KPU model (nncase → `.kmodel`), real classifier replaces heuristic

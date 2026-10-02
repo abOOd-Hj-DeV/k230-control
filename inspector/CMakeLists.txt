@@ -8,6 +8,7 @@ set(INSPECTOR_SOURCES
   src/raw_pcm_decoder.cpp
   src/vdec_decoder.cpp
   src/kpu_analyzer.cpp
+  src/nsfwjs_analyzer.cpp
 )
 
 add_library(k230_inspector STATIC ${INSPECTOR_SOURCES})
@@ -23,6 +24,21 @@ if(K230_TARGET STREQUAL "pc")
   target_sources(k230_inspector PRIVATE src/ffmpeg_decoder.cpp)
   target_link_libraries(k230_inspector PUBLIC PkgConfig::FFMPEG)
   target_compile_definitions(k230_inspector PUBLIC K230_HAS_FFMPEG=1)
+endif()
+
+if(K230_ENABLE_ONNX)
+  find_path(ONNXRUNTIME_INCLUDE_DIR onnxruntime_cxx_api.h
+    HINTS "${ONNXRUNTIME_ROOT}" PATH_SUFFIXES include include/onnxruntime/core/session)
+  find_library(ONNXRUNTIME_LIBRARY onnxruntime HINTS "${ONNXRUNTIME_ROOT}" PATH_SUFFIXES lib lib64)
+  if(NOT ONNXRUNTIME_INCLUDE_DIR OR NOT ONNXRUNTIME_LIBRARY)
+    message(FATAL_ERROR "ONNX Runtime SDK not found. Run python3 tools/setup_onnxruntime.py, then set ONNXRUNTIME_ROOT.")
+  endif()
+  add_library(onnxruntime SHARED IMPORTED)
+  set_target_properties(onnxruntime PROPERTIES
+    IMPORTED_LOCATION "${ONNXRUNTIME_LIBRARY}"
+    INTERFACE_INCLUDE_DIRECTORIES "${ONNXRUNTIME_INCLUDE_DIR}")
+  target_link_libraries(k230_inspector PUBLIC onnxruntime)
+  target_compile_definitions(k230_inspector PUBLIC K230_HAS_ONNX=1)
 endif()
 
 # Big-core executable. Reads packets from DATAFIFO (K230) or a .k230rec file
