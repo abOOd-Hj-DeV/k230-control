@@ -11,8 +11,12 @@
 
 int main(int argc, char** argv) {
   k230::Cli cli(argc, argv);
-  if (cli.has("read")) {
-    std::ifstream input(cli.get("read"), std::ios::binary);
+  if (cli.has("help")) {
+    std::puts("k230-layout-dump [--replay FILE | --adb PATH --serial ID --duration SEC --record FILE]");
+    return 0;
+  }
+  if (cli.has("replay") || cli.has("read")) {
+    std::ifstream input(cli.get("replay", cli.get("read", "")), std::ios::binary);
     if (!input) return 1;
     std::array<std::uint8_t, 4> prefix;
     while (input.read(reinterpret_cast<char*>(prefix.data()), prefix.size())) {
