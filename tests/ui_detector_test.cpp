@@ -2,6 +2,8 @@
 #include <atomic>
 #include <limits>
 #include <stdexcept>
+#include <future>
+#include <condition_variable>
 
 #include <gtest/gtest.h>
 
@@ -25,16 +27,19 @@ void box(std::vector<float>& output, std::size_t index, float x, float y, float 
 
 class TestDetector final : public RegionDetector {
  public:
-  explicit TestDetector(bool small_only) : small_only_(small_only) {}
+  explicit TestDetector(bool small_only, bool complete = true) : small_only_(small_only), complete_(complete) {}
   bool open() override { return true; }
   UiDetections detect(const VideoFrame& frame) override {
     auto output = predictions();
     if (!small_only_) box(output, 0, 200, 250, 200, 100);
     box(output, 1, 400, 250, 32, 32);
-    return ui_regions(frame, output, UiDetectorConfig{});
+    auto result = ui_regions(frame, output, UiDetectorConfig{});
+    result.complete &= complete_;
+    return result;
   }
  private:
   bool small_only_;
+  bool complete_;
 };
 
 class CountingAnalyzer final : public RegionAnalyzer {
@@ -54,6 +59,25 @@ class CountingAnalyzer final : public RegionAnalyzer {
   }
  private:
   std::atomic<unsigned>& calls_;
+};
+class GatedAnalyzer final : public RegionAnalyzer {
+ public:
+  GatedAnalyzer(std::promise<void>& entered, std::shared_future<void> release)
+      : entered_(entered), release_(std::move(release)) {}
+  bool open() override { return true; }
+  Scores analyze_region(const VideoFrame& frame, const ImageRegion&) override {
+    if (frame.pts_us == 10200000) {
+      entered_.set_value();
+      if (release_.wait_for(std::chrono::seconds(2)) != std::future_status::ready)
+        throw std::runtime_error("test_gate_timeout");
+    }
+    Scores scores; scores.nudity = .65f; scores.nsfwjs = NsfwjsScores{};
+    scores.nsfwjs->porn = .65f; scores.nsfwjs->neutral = .35f;
+    return scores;
+  }
+ private:
+  std::promise<void>& entered_;
+  std::shared_future<void> release_;
 };
 }  // namespace
 
@@ -161,8 +185,8 @@ TEST(FastVisionUi, ClassifiesOnlyLargeDetectionsOnTheirOwnFrameAndNeverFallsBack
       EXPECT_EQ(frame.pts_us, 123'456);
       EXPECT_EQ(scores.analysis_regions, small_only ? 0u : 1u);
       EXPECT_EQ(scores.crop.has_value(), !small_only);
-      EXPECT_FALSE(scores.analysis_complete);
-      EXPECT_EQ(verdict.category, Category::Unknown);
+      EXPECT_EQ(scores.analysis_complete, !small_only);
+      EXPECT_EQ(verdict.category, small_only ? Category::Unknown : Category::Safe);
     });
     ASSERT_TRUE(vision.start());
     vision.submit(test::make_frame(123'456, 640, 320));
@@ -174,6 +198,52 @@ TEST(FastVisionUi, ClassifiesOnlyLargeDetectionsOnTheirOwnFrameAndNeverFallsBack
     EXPECT_EQ(vision.stats().ignored_small, 1u);
     EXPECT_EQ(vision.stats().layout_misses, 0u);
   }
+}
+
+TEST(FastVisionUi, PartialSelectionStaysUnknownWhileCompleteLegacySelectionIsSafe) {
+  std::atomic<unsigned> calls{0};
+  auto verdicts = std::make_shared<ipc::InProcessQueue<Verdict>>(8);
+  FastVision vision([&] { return std::make_unique<CountingAnalyzer>(calls); },
+                    std::make_unique<TestDetector>(false, false), PolicyConfig{}, verdicts);
+  bool observed = false;
+  vision.set_observer([&](const auto&, const auto& scores, const auto& verdict) {
+    observed = true; EXPECT_FALSE(scores.analysis_complete); EXPECT_EQ(verdict.category, Category::Unknown);
+  });
+  ASSERT_TRUE(vision.start()); vision.submit(test::make_frame(123456,640,320)); vision.finish();
+  EXPECT_TRUE(observed);
+}
+
+TEST(FastVisionUi, PendingOverwriteMarksReplacementNotOldInflightWorkAndBreaksEvidence) {
+  std::promise<void> entered, release;
+  auto inflight = entered.get_future(); auto proceed = release.get_future().share();
+  auto verdicts = std::make_shared<ipc::InProcessQueue<Verdict>>(8);
+  FastVision vision([&] { return std::make_unique<GatedAnalyzer>(entered, proceed); },
+                    std::make_unique<TestDetector>(false), PolicyConfig{}, verdicts);
+  AgePolicy policy; ASSERT_TRUE(policy.set_profile(12,1));
+  std::mutex mutex; std::condition_variable changed;
+  std::vector<AnalysisBatch> batches; std::vector<int> stages;
+  vision.set_batch_observer([&](AnalysisBatch batch) {
+    std::lock_guard<std::mutex> lock(mutex);
+    stages.push_back(policy.evaluate(batch).stage); batches.push_back(std::move(batch)); changed.notify_all();
+  });
+  auto wait_for_batches = [&](std::size_t count) {
+    std::unique_lock<std::mutex> lock(mutex);
+    return changed.wait_for(lock,std::chrono::seconds(2),[&] { return batches.size()>=count; });
+  };
+  ASSERT_TRUE(vision.start()); vision.submit(test::make_frame(10000000,640,320));
+  ASSERT_TRUE(wait_for_batches(1));
+  vision.submit(test::make_frame(10200000,640,320));
+  const auto ready = inflight.wait_for(std::chrono::seconds(2));
+  if (ready != std::future_status::ready) { release.set_value(); vision.finish(); FAIL() << "inflight frame not reached"; }
+  vision.submit(test::make_frame(10400000,640,320));
+  vision.submit(test::make_frame(10600000,640,320)); release.set_value();
+  ASSERT_TRUE(wait_for_batches(3));
+  vision.submit(test::make_frame(10800000,640,320)); vision.finish();
+  ASSERT_EQ(batches.size(),4u);
+  EXPECT_EQ(batches[1].pts_us,10200000); EXPECT_FALSE(batches[1].discontinuity);
+  EXPECT_EQ(batches[2].pts_us,10600000); EXPECT_TRUE(batches[2].discontinuity);
+  EXPECT_FALSE(batches[3].discontinuity); EXPECT_EQ(vision.stats().dropped,1u);
+  EXPECT_EQ(stages,(std::vector<int>{0,0,0,0}));
 }
 
 #ifdef K230_HAS_ONNX

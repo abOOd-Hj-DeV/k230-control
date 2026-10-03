@@ -13,6 +13,15 @@ std::int64_t ProtectionSession::phone_now() const {
   if (base > INT64_MAX - elapsed) throw std::runtime_error("bounds");
   return base + elapsed;
 }
+void ProtectionSession::reconcile_protection() {
+  emitted_stage_ = native_stage_; masks_.clear(); mask_pts_ = -1;
+  for (const auto& entry : claims_) {
+    const auto& claim = entry.second;
+    emitted_stage_ = std::max(emitted_stage_,claim.stage);
+    masks_.insert(masks_.end(),claim.masks.begin(),claim.masks.end());
+    if (mask_pts_ < 0 || claim.pts < mask_pts_) mask_pts_ = claim.pts;
+  }
+}
 void ProtectionSession::disconnected() {
   std::lock_guard<std::mutex> lock(mutex_);
   bound_ = false; hello_ = nullptr; state_ = nullptr; policy_.reset_evidence();
@@ -50,7 +59,8 @@ void ProtectionSession::receive(const Json& message) {
       const auto& protection = state_.at("protection");
       if (protection.at("stage").get<int>() > 0) {
         if (event_id_.empty()) event_id_ = protection.at("event_id");
-        emitted_stage_ = std::max(emitted_stage_,protection.at("stage").get<int>());
+        native_stage_ = std::max(native_stage_,protection.at("stage").get<int>());
+        reconcile_protection();
       }
       return;
     }
@@ -62,6 +72,7 @@ void ProtectionSession::receive(const Json& message) {
       }
       event_screen_token_.clear(); stats_.unknown += pending_.size();
       event_id_.clear(); revision_ = 0; emitted_stage_ = 0; masks_.clear(); mask_pts_ = -1;
+      claims_.clear(); native_stage_ = 0;
       pending_.clear(); policy_.reset_evidence(); return;
     }
     if (type != "ack") { ++stats_.rejected; return; }
@@ -77,7 +88,23 @@ void ProtectionSession::receive(const Json& message) {
         actual == command.at("requested_stage").get<int>() && message.at("error").is_null()) {
       ++stats_.executed;
       policy_.executed(event_id_,command.at("package"),actual,companion::decimal(message.at("executed_at_us")));
-    } else ++stats_.failed;
+    } else {
+      ++stats_.failed;
+      if (message.at("status") == "rejected" || message.at("status") == "failed") {
+        if (actual == 0) claims_.erase(revision);
+        else {
+          auto claim = claims_.find(revision);
+          if (claim != claims_.end()) {
+            claim->second.stage = actual;
+            if (!message.at("display_rects").empty()) {
+              claim->second.masks.clear();
+              for (const auto& rect : message.at("display_rects")) claim->second.masks.push_back(companion::rect_from_json(rect));
+            }
+          }
+        }
+        reconcile_protection(); policy_.reset_evidence();
+      }
+    }
     pending_.erase(it);
   } catch (const std::exception&) { ++stats_.rejected; }
 }
@@ -141,32 +168,23 @@ void ProtectionSession::analyze(AnalysisBatch batch) {
       if (decision.stage == 1) {
         auto mapped = companion::map_rect(p.region.crop,batch.width,batch.height,0,viewport);
         if (std::find(masks_.begin(),masks_.end(),mapped) != masks_.end()) continue;
-        if (masks_.size()+candidates.size() >= 8) { ++stats_.rejected; break; }
+        if (masks_.size()+candidates.size() >= 8) { ++stats_.rejected; return; }
       }
       candidates.push_back(p);
     }
-    // Each chunk is independently proven and ACKed; no evidence truncation.
-    while (!candidates.empty()) {
-      std::vector<RegionProof> chunk;
-      Json command;
-      for (const auto& p : candidates) {
-        auto trial = chunk; trial.push_back(p); auto next = make_decision(batch,decision,trial);
-        if (next.dump().size() >= companion::kMaxLine) break;
-        chunk = std::move(trial); command = std::move(next);
-      }
-      if (chunk.empty()) { ++stats_.rejected; break; }
+    if (!candidates.empty()) {
+      auto command = make_decision(batch,decision,candidates);
+      if (command.dump().size() >= companion::kMaxLine) { ++stats_.rejected; return; }
       auto rects = companion::validate_decision(command,state_,now,clock_verified_);
       auto caps = hello_.at("capabilities");
-      if (std::find(caps.begin(),caps.end(),command.at("requested_action")) == caps.end()) { ++stats_.rejected; break; }
+      if (std::find(caps.begin(),caps.end(),command.at("requested_action")) == caps.end()) { ++stats_.rejected; return; }
       companion::line(command);
-      if (!downstream_->push(Json(command))) { ++stats_.rejected; break; }
+      if (!downstream_->push(Json(command))) { ++stats_.rejected; return; }
       ++send_seq_; ++revision_; ++stats_.submitted;
       event_screen_token_ = command.at("screen_token");
       pending_[revision_] = {command,std::chrono::steady_clock::now()};
-      emitted_stage_ = std::max(emitted_stage_,decision.stage);
-      if (mask_pts_ < 0) mask_pts_ = batch.pts_us;
-      masks_.insert(masks_.end(),rects.begin(),rects.end());
-      candidates.erase(candidates.begin(),candidates.begin()+chunk.size());
+      claims_[revision_] = {decision.stage,std::move(rects),batch.pts_us};
+      reconcile_protection();
     }
   } catch (const std::exception&) { ++stats_.rejected; policy_.reset_evidence(); }
 }

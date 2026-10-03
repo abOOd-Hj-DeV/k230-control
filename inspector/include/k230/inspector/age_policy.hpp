@@ -46,6 +46,7 @@ class AgePolicy {
  private:
   struct Chain {
     std::deque<companion::Json> observations;
+    std::int64_t started_pts = -1;
     void add(bool qualifies, std::int64_t pts, companion::Probabilities scores);
     bool ready(std::size_t count, std::int64_t span) const;
   };
@@ -62,7 +63,6 @@ class AgePolicy {
   std::deque<Event> events_;
   std::uint64_t next_id_ = 1;
   std::int64_t last_pts_ = -1;
-  std::int64_t deferral_deadline_ = -1;
   std::string identity_;
 };
 }  // namespace k230::inspector

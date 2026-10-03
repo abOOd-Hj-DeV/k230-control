@@ -44,9 +44,13 @@ struct SessionHarness {
     session.receive(bound); state["stream_id"]=session.stream_id();
   }
   void analyze(std::int64_t pts,double p=.65,double h=0) {
+    analyze(sample(pts,p,h));
+  }
+  void analyze(AnalysisBatch batch) {
+    const auto pts=batch.pts_us;
     state["seq"]=std::to_string(++seq); state["phone_time_us"]=std::to_string(pts);
     state["screen"]["sampled_at_us"]=std::to_string(pts);
-    session.receive(state); session.analyze(sample(pts,p,h));
+    session.receive(state); session.analyze(std::move(batch));
   }
   Json ack(const Json& command,const std::string& status="executed") {
     auto result=fixture("ack");
@@ -155,7 +159,22 @@ TEST(AgePolicyV2, DeferralIsBoundedAndLowObservationBreaksExitProof) {
   EXPECT_EQ(result.stage,2); // Currently supported shield; no exit evidence survives the dip.
   policy.reset_evidence();
   EXPECT_EQ(chain(policy,3,12000000,400000,.95).stage,0);
-  EXPECT_EQ(policy.evaluate(sample(13000000,.95)).stage,2); // Four samples at deadline, not five.
+  EXPECT_EQ(policy.evaluate(sample(13000000,.95)).stage,0);
+  EXPECT_EQ(policy.evaluate(sample(13200000,.95)).stage,3);
+  policy.reset_evidence();
+  for (int i=0;i<5;++i) EXPECT_EQ(policy.evaluate(sample(14000000+i*500000,.95)).stage,i==4?3:0);
+}
+TEST(AgePolicyV2, BrokenExitChainsAndNewTracksHaveTheirOwnNonSlidingDeferral) {
+  for (bool identity_change:{false,true}) {
+    AgePolicy policy; ASSERT_TRUE(policy.set_profile(12,1));
+    EXPECT_EQ(chain(policy,3,10000000,200000,.95).stage,0);
+    if (!identity_change) { EXPECT_EQ(policy.evaluate(sample(10500000,0)).stage,0); }
+    for (int i=0;i<11;++i) {
+      auto batch=sample(10600000+i*100000,.95);
+      if (identity_change) batch.identity="new-screen";
+      EXPECT_EQ(policy.evaluate(batch).stage,i==10?3:0);
+    }
+  }
 }
 TEST(AgePolicyV2, RepetitionDeduplicatesExecutedEpisodesAndNeverCreatesHome) {
   for (int age:{12,13}) {
@@ -275,6 +294,101 @@ TEST(ProtectionSessionV2, NoClockOptInMeansNoBindAndNoIntervention) {
   auto queue=std::make_shared<ipc::ControlQueue>(); ProtectionSession session(queue,false);
   session.receive(fixture("hello")); session.analyze(sample(10000000,.95));
   EXPECT_FALSE(queue->pop(std::chrono::milliseconds(0))); EXPECT_EQ(session.stats().submitted,0u);
+}
+TEST(ProtectionSessionV2, FreshHighPornEpisodeAfterLowResetStillHasHomeAsFirstAction) {
+  SessionHarness harness;
+  for (int i=0;i<5;++i) harness.analyze(10000000+i*100000,.95);
+  harness.analyze(10500000,0);
+  for (int i=0;i<10;++i) {
+    harness.analyze(10600000+i*100000,.95);
+    EXPECT_FALSE(harness.queue->pop(std::chrono::milliseconds(0)));
+  }
+  harness.analyze(11600000,.95);
+  auto command=harness.queue->pop(std::chrono::milliseconds(0)); ASSERT_TRUE(command);
+  EXPECT_EQ(command->at("requested_stage"),3); EXPECT_EQ(command->at("action_revision"),"1");
+}
+TEST(ProtectionSessionV2, ExplicitNonExecutionPermitsFreshProofButUnknownRemainsConservative) {
+  for (const std::string status:{"rejected","failed","lost"}) {
+    SCOPED_TRACE(status); SessionHarness harness;
+    for (int i=0;i<3;++i) harness.analyze(10000000+i*200000,.85);
+    auto shield=harness.queue->pop(std::chrono::milliseconds(0)); ASSERT_TRUE(shield);
+    EXPECT_EQ(shield->at("requested_stage"),2);
+    if (status=="lost") {
+      harness.session.disconnected(); harness.session.receive(fixture("hello"));
+      auto bind=harness.queue->pop(std::chrono::milliseconds(0)); ASSERT_TRUE(bind);
+      auto bound=fixture("bound"); bound["stream_id"]=harness.session.stream_id();
+      harness.session.receive(bound);
+    } else harness.session.receive(harness.ack(*shield,status));
+    for (int i=0;i<3;++i) harness.analyze(10600000+i*200000);
+    auto retry=harness.queue->pop(std::chrono::milliseconds(0));
+    if (status=="lost") {
+      EXPECT_FALSE(retry); EXPECT_EQ(harness.session.stats().unknown,1u);
+    } else {
+      ASSERT_TRUE(retry); EXPECT_EQ(retry->at("requested_stage"),1);
+      EXPECT_EQ(retry->at("action_revision"),"2");
+      EXPECT_EQ(harness.session.stats().failed,1u); EXPECT_EQ(harness.session.stats().executed,0u);
+    }
+  }
+}
+TEST(ProtectionSessionV2, FailedRevisionNeverClearsAnEarlierConfirmedOrNativeMask) {
+  for (bool native_confirmation:{false,true}) {
+    SessionHarness harness;
+    for (int i=0;i<3;++i) harness.analyze(10000000+i*200000);
+    auto first=harness.queue->pop(std::chrono::milliseconds(0)); ASSERT_TRUE(first);
+    if (native_confirmation) {
+      auto& protection=harness.state["protection"];
+      protection["stage"]=1; protection["event_id"]=first->at("event_id");
+      protection["applied_at_us"]=first->at("pts_us");
+      protection["covered_rects"]=Json::array({companion::rect_json({60,300,480,900})});
+      harness.analyze(10500000);
+      harness.session.receive(harness.ack(*first,"failed"));
+    } else {
+      harness.session.receive(harness.ack(*first));
+      for (int i=0;i<3;++i) {
+        auto batch=sample(10600000+i*200000); batch.regions[0].crop={200,100,100,300};
+        harness.analyze(std::move(batch));
+      }
+      auto second=harness.queue->pop(std::chrono::milliseconds(0)); ASSERT_TRUE(second);
+      harness.session.receive(harness.ack(*second,"failed"));
+    }
+    for (int i=0;i<12;++i) harness.analyze(11200000+i*100000,.95);
+    EXPECT_FALSE(harness.queue->pop(std::chrono::milliseconds(0)));
+  }
+}
+TEST(ProtectionSessionV2, EightSimultaneousCoversUseOneBoundedRecordAndOneRevision) {
+  SessionHarness harness;
+  for (int i=0;i<5;++i) {
+    auto batch=sample(10000000+i*100000); batch.regions.clear();
+    for (int j=0;j<8;++j) batch.regions.push_back({{10+(j%2)*180,20+(j/2)*180,150,160},"Image",{.65,0,0},true,false});
+    harness.analyze(std::move(batch));
+  }
+  auto command=harness.queue->pop(std::chrono::milliseconds(0)); ASSERT_TRUE(command);
+  EXPECT_EQ(command->at("regions").size(),8u); EXPECT_EQ(command->at("action_revision"),"1");
+  EXPECT_LE(companion::line(*command).size(),companion::kMaxLine);
+  EXPECT_FALSE(harness.queue->pop(std::chrono::milliseconds(0))); EXPECT_EQ(harness.session.stats().submitted,1u);
+}
+TEST(ProtectionSessionV2, OversizedMultiCropDecisionIsRejectedWholeWithoutPartialClaims) {
+  SessionHarness harness;
+  for (int i=0;i<32;++i) ASSERT_TRUE(harness.queue->push(fixture("hello")));
+  for (int i=0;i<32;++i) {
+    auto batch=sample(10000000+i*100000); batch.regions.clear();
+    for (int j=0;j<8;++j) batch.regions.push_back({{10+(j%2)*180,20+(j/2)*180,150,160},"Image",{.65,0,0},true,false});
+    harness.analyze(std::move(batch));
+  }
+  for (int i=0;i<32;++i) {
+    auto item=harness.queue->pop(std::chrono::milliseconds(0)); ASSERT_TRUE(item);
+    EXPECT_EQ(item->at("type"),"hello");
+  }
+  auto oversized=sample(13200000); oversized.regions.clear();
+  for (int j=0;j<8;++j) oversized.regions.push_back({{10+(j%2)*180,20+(j/2)*180,150,160},"Image",{.65,0,0},true,false});
+  const auto rejected=harness.session.stats().rejected;
+  harness.analyze(std::move(oversized));
+  EXPECT_EQ(harness.session.stats().submitted,0u); EXPECT_GT(harness.session.stats().rejected,rejected);
+  EXPECT_FALSE(harness.queue->pop(std::chrono::milliseconds(0)));
+  harness.analyze(13300000,0);
+  for (int i=0;i<3;++i) harness.analyze(13400000+i*200000);
+  auto fresh=harness.queue->pop(std::chrono::milliseconds(0)); ASSERT_TRUE(fresh);
+  EXPECT_EQ(fresh->at("action_revision"),"1"); EXPECT_EQ(fresh->at("regions").size(),1u);
 }
 TEST(ProtectionSessionV2, SafeCoveredPixelsAndReconnectNeverClearOrEscalateProtection) {
   SessionHarness harness;

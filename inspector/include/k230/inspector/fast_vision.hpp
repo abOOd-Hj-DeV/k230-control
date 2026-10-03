@@ -60,7 +60,7 @@ class FastVision {
     VisionRegions selection;
     std::vector<std::optional<Scores>> scores;
     std::size_t finished = 0;
-    bool failed = false;
+    bool failed = false, discontinuity = false;
     std::chrono::steady_clock::time_point arrival;
   };
   struct Job { std::shared_ptr<FrameWork> work; std::size_t index; };

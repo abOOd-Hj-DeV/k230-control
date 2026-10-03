@@ -61,8 +61,11 @@ unproven. There is no heuristic enforcement fallback.
   Empty/partial analysis is never Safe. Legacy diagnostic Safe semantics remain
   unchanged; v2 Safe is a narrowly scoped batch result, never a release command.
 - To avoid covering a currently qualifying Porn chain before HOME is provable,
-  lower actions may be held until that chain's first observation +1s. This is
-  globally bounded: even a competing Hentai shield cannot preempt it. At the
+  lower actions may be held until that track's exit chain first observation +2s.
+  The deadline never slides; a broken chain or identity starts a fresh deadline.
+  Five observations spaced at the maximum 500ms gap can complete the proof;
+  at 10Hz HOME remains eligible at 1s. Even a competing Hentai shield cannot
+  preempt an active exit candidate. At the
   deadline, the strongest **currently proven** action wins, not an invented
   fifth observation. A risk dip releases the hold immediately. Gaps invalidate
   the chain; stale/failed evidence cannot be executed merely because a timer ran.
@@ -70,14 +73,20 @@ unproven. There is no heuristic enforcement fallback.
   never advance evidence, Safe does not remove protection, and no revealing
   overlay cycle is used to escalate. A successful correlated execution ACK is
   required before counting an executed episode. Failed/unknown ACKs are degraded,
-  not success. Same-episode execution is deduplicated for repetition; count only
+  not success. An explicit failed/rejected ACK with executed_stage=0 removes
+  only that revision's optimistic mask/stage and resets evidence for fresh proof.
+  Earlier executed/unknown revisions and authoritative native protection remain;
+  missing ACKs/disconnects never remove conservative masks. Same-episode execution
+  is deduplicated for repetition; count only
   distinct successful cover/shield episodes in the strict rolling 60s window,
   with younger=2/older=3 cap at shield. Profile changes reset counters.
 - Releases are native verified navigation/new-content/guardian grants, correlated
   to event/revision/previous token. C++ never sends a release because its classifier
   sees the shield. Disconnect drops pending commands without replaying them and
   retains conservative protection knowledge. No automatic retry is performed;
-  an uncertain HOME is never resent as a new execution.
+  an uncertain HOME is never resent as a new execution. All simultaneous cover
+  crops share one decision/revision/ACK. If the complete set exceeds the bounded
+  line or crop budget, reject the whole decision; never send partial chunks.
 
 ## Wire, queues and ownership
 

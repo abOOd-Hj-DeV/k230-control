@@ -30,9 +30,10 @@ bool AgePolicy::set_profile(int age, std::int64_t revision) {
   if (!profile_ || revision != profile_->revision) { profile_ = next; reset_evidence(); events_.clear(); }
   return true;
 }
-void AgePolicy::reset_evidence() { tracks_.clear(); identity_.clear(); last_pts_ = -1; deferral_deadline_ = -1; }
+void AgePolicy::reset_evidence() { tracks_.clear(); identity_.clear(); last_pts_ = -1; }
 void AgePolicy::Chain::add(bool qualifies, std::int64_t pts, companion::Probabilities scores) {
-  if (!qualifies) { observations.clear(); return; }
+  if (!qualifies) { observations.clear(); started_pts = -1; return; }
+  if (started_pts < 0) started_pts = pts;
   auto o = companion::scores_json(scores, false); o["pts_us"] = std::to_string(pts);
   observations.push_back(std::move(o)); if (observations.size() > 32) observations.pop_front();
 }
@@ -50,7 +51,7 @@ AgeDecision AgePolicy::evaluate(const AnalysisBatch& batch) {
   AgeDecision out;
   if (!profile_ || batch.pts_us < 0 || batch.pts_us <= last_pts_) return out;
   if (batch.identity != identity_ || batch.discontinuity || (last_pts_ >= 0 && batch.pts_us-last_pts_ > 500000)) {
-    tracks_.clear(); deferral_deadline_ = -1;
+    tracks_.clear();
   }
   last_pts_ = batch.pts_us; identity_ = batch.identity;
   if (batch.width < 1 || batch.height < 1 || batch.width > 16384 || batch.height > 16384 || batch.regions.size() > 8) {
@@ -101,12 +102,10 @@ AgeDecision AgePolicy::evaluate(const AnalysisBatch& batch) {
     if (stage == 1 && events >= profile_->repetition_limit()) { stage = 2; repeated = true; }
     if (t.exit.ready(5,1000000)) { stage = 3; proof = &t.exit; repeated = false; }
     // Only unmasked, currently qualifying exit evidence can delay a proven lower action.
-    if (stage > 0 && stage < 3 && !t.exit.observations.empty()) {
-      if (deferral_deadline_ < 0) {
-        auto first = companion::decimal(t.exit.observations.front().at("pts_us"));
-        deferral_deadline_ = first > INT64_MAX-1000000 ? INT64_MAX : first+1000000;
-      }
-      out.deferred |= batch.pts_us < deferral_deadline_;
+    if (stage < 3 && !t.exit.observations.empty()) {
+      const auto first = t.exit.started_pts;
+      const auto deadline = first > INT64_MAX-2000000 ? INT64_MAX : first+2000000;
+      out.deferred |= batch.pts_us < deadline;
     }
     if (stage) out.regions.push_back({t.id,r,t.continuity,proof->observations,stage,repeated});
     next.push_back(std::move(t));

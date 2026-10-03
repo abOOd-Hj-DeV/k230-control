@@ -19,6 +19,7 @@ class ProtectionSession {
   std::int64_t phone_now() const;
   companion::Json make_decision(const AnalysisBatch&, const AgeDecision&, const std::vector<RegionProof>&);
   void expire_pending();
+  void reconcile_protection();
   std::shared_ptr<ipc::ControlSink> downstream_;
   bool clock_verified_ = false, bound_ = false;
   std::string stream_id_, event_id_, event_screen_token_;
@@ -28,9 +29,12 @@ class ProtectionSession {
   AgePolicy policy_;
   struct Pending { companion::Json command; std::chrono::steady_clock::time_point submitted; };
   std::map<std::int64_t, Pending> pending_;
+  struct ProtectionClaim { int stage; std::vector<companion::Rect> masks; std::int64_t pts; };
+  std::map<std::int64_t, ProtectionClaim> claims_;
   std::vector<companion::Rect> masks_;
   std::int64_t mask_pts_ = -1;
   int emitted_stage_ = 0;
+  int native_stage_ = 0;
   Stats stats_;
   mutable std::mutex mutex_;
 };

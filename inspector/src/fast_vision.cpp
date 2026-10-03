@@ -158,6 +158,7 @@ void FastVision::coordinate() {
       if (!pending_) return;
       work->frame = std::move(pending_);
       work->arrival = pending_arrival_;
+      work->discontinuity = discontinuity_.exchange(false);
     }
     const auto transform_start = std::chrono::steady_clock::now();
     if (detector_) {
@@ -167,7 +168,7 @@ void FastVision::coordinate() {
         stats_.ignored_small += detected.ignored_small;
         work->selection.regions = std::move(detected.regions);
         work->selection.kinds = std::move(detected.kinds);
-        work->selection.complete = detected.complete;
+        work->selection.complete = detected.complete && !work->selection.regions.empty();
         for (std::size_t i = 0; i < work->selection.regions.size(); ++i) {
           work->selection.ids.push_back(static_cast<std::uint32_t>(i + 1));
         }
@@ -196,7 +197,7 @@ void FastVision::coordinate() {
     batch.pts_us = work->frame->pts_us;
     batch.width = work->frame->width; batch.height = work->frame->height;
     batch.complete = work->selection.complete && !work->failed;
-    batch.discontinuity = discontinuity_.exchange(false);
+    batch.discontinuity = work->discontinuity;
     for (std::size_t i = 0; i < work->scores.size(); ++i) {
       if (batch_observer_) {
         auto crop = work->selection.regions[i];
@@ -224,7 +225,7 @@ void FastVision::coordinate() {
       aggregate.crop = work->selection.regions[aggregate.analysis_region];
     }
     aggregate.transform_ms = transform_ms;
-    aggregate.analysis_complete = false;
+    aggregate.analysis_complete = work->selection.complete && !work->failed;
     aggregate.frame_ms = std::chrono::duration<double, std::milli>(
         std::chrono::steady_clock::now() - work->arrival).count();
     if (batch_observer_) batch_observer_(std::move(batch));
