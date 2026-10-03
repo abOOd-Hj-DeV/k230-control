@@ -62,6 +62,7 @@ void usage() {
       "  --layout-record FILE          record the independently framed layout stream\n"
       "  --ui-model PATH               Android UI YOLOv8 Nano ONNX + two NSFWJS workers, without Mentor\n"
       "  --ui-confidence X             detector confidence threshold (default: 0.25)\n"
+      "  --ui-iou X --ui-max-regions N  overlap threshold (0.7) and crop limit (8)\n"
       "  --ui-min-side N               minimum crop width AND height in decoded pixels (default: 64)\n"
       "  --ui-min-area X               minimum crop fraction of frame area (default: 0.01)\n"
       "  --warn X --block X --confirm N --cooldown-ms N   policy tuning\n"
@@ -110,6 +111,8 @@ int main(int argc, char** argv) {
     ui.min_side = static_cast<std::uint32_t>(cli.get_int("ui-min-side", 64));
     ui.min_area = static_cast<float>(cli.get_double("ui-min-area", 0.01));
     ui.confidence = static_cast<float>(cli.get_double("ui-confidence", 0.25));
+    ui.iou = static_cast<float>(cli.get_double("ui-iou", 0.7));
+    ui.max_regions = static_cast<std::uint32_t>(cli.get_int("ui-max-regions", 8));
     detector = inspector::make_ui_detector(ui);
     if (!detector || !detector->open()) return 1;
   }

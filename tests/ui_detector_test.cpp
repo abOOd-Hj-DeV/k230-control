@@ -132,6 +132,23 @@ TEST(UiRegions, RejectsMalformedOutputsAndConfiguration) {
   EXPECT_THROW(ui_regions(frame, predictions(), config), std::invalid_argument);
 }
 
+TEST(UiRegions, SmallHigherConfidenceBoxesCannotSuppressEligibleMediaAndCropLimitUsesConfidence) {
+  auto output = predictions();
+  box(output, 0, 100, 100, 63, 100, 9, 0.99f);
+  box(output, 1, 100, 100, 64, 100, 9, 0.9f);
+  box(output, 2, 400, 400, 100, 100, 0, 0.8f);
+  UiDetectorConfig config;
+  config.max_regions = 1;
+  const auto frame = test::make_frame(100, 640, 640);
+  const auto limited = ui_regions(frame, output, config);
+  ASSERT_EQ(limited.regions.size(), 1u);
+  EXPECT_EQ(limited.regions[0].x, 68u);
+  EXPECT_EQ(limited.regions[0].width, 64u);
+  EXPECT_EQ(limited.ignored_small, 1u);
+  config.max_regions = 2;
+  EXPECT_EQ(ui_regions(frame, output, config).regions.size(), 2u);
+}
+
 TEST(FastVisionUi, ClassifiesOnlyLargeDetectionsOnTheirOwnFrameAndNeverFallsBackToStrips) {
   for (const bool small_only : {false, true}) {
     std::atomic<unsigned> calls{0};

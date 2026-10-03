@@ -127,15 +127,17 @@ UiDetections ui_regions(const VideoFrame& frame, const std::vector<float>& predi
   });
   if (candidates.size() > 300) candidates.resize(300);
   UiDetections result;
-  std::vector<Candidate> kept;
+  std::vector<Candidate> kept, ignored;
   for (const auto& candidate : candidates) {
-    if (std::any_of(kept.begin(), kept.end(), [&](const auto& previous) {
+    const double width = candidate.right - candidate.left, height = candidate.bottom - candidate.top;
+    const bool small = width < config.min_side || height < config.min_side ||
+                       width * height < config.min_area * static_cast<double>(frame.width) * frame.height;
+    auto& group = small ? ignored : kept;
+    if (std::any_of(group.begin(), group.end(), [&](const auto& previous) {
       return overlap(candidate, previous) > config.iou;
     })) continue;
-    kept.push_back(candidate);
-    const double width = candidate.right - candidate.left, height = candidate.bottom - candidate.top;
-    if (width < config.min_side || height < config.min_side ||
-        width * height < config.min_area * static_cast<double>(frame.width) * frame.height) {
+    group.push_back(candidate);
+    if (small) {
       ++result.ignored_small;
       continue;
     }
