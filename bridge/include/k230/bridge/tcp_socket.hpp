@@ -24,6 +24,7 @@ class TcpSocket {
 
   // Returns bytes read (>0), 0 on orderly shutdown, -1 on error / timeout.
   long recv(std::uint8_t* buf, std::size_t len, int timeout_ms = -1);
+  bool last_receive_timed_out() const { return last_receive_timed_out_; }
   bool recv_exact(std::uint8_t* buf, std::size_t len, int timeout_ms = -1);
   bool send_all(const std::uint8_t* buf, std::size_t len);
   bool send_all(const std::string& s);
@@ -33,6 +34,7 @@ class TcpSocket {
 
  private:
   int fd_ = -1;
+  bool last_receive_timed_out_ = false;
 };
 
 }  // namespace k230::bridge

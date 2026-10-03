@@ -13,6 +13,38 @@
 
 using namespace k230::bridge;
 
+TEST(TcpSocket, DistinguishesTimeoutFromDisconnectedPeer) {
+  const int listener = ::socket(AF_INET, SOCK_STREAM, 0);
+  ASSERT_GE(listener, 0);
+  sockaddr_in address{};
+  address.sin_family = AF_INET;
+  address.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
+  address.sin_port = 0;
+  ASSERT_EQ(::bind(listener, reinterpret_cast<sockaddr*>(&address), sizeof(address)), 0);
+  ASSERT_EQ(::listen(listener, 1), 0);
+  socklen_t address_size = sizeof(address);
+  ASSERT_EQ(::getsockname(listener, reinterpret_cast<sockaddr*>(&address), &address_size), 0);
+
+  TcpSocket client;
+  ASSERT_TRUE(client.connect("127.0.0.1", ntohs(address.sin_port)));
+  const int peer = ::accept(listener, nullptr, nullptr);
+  ASSERT_GE(peer, 0);
+
+  std::uint8_t byte = 0;
+  EXPECT_EQ(client.recv(&byte, 1, 20), -1);
+  EXPECT_TRUE(client.last_receive_timed_out());
+  ASSERT_EQ(::send(peer, "x", 1, 0), 1);
+  EXPECT_EQ(client.recv(&byte, 1, 100), 1);
+  EXPECT_FALSE(client.last_receive_timed_out());
+  EXPECT_EQ(byte, static_cast<std::uint8_t>('x'));
+  ::close(peer);
+  EXPECT_EQ(client.recv(&byte, 1, 100), 0);
+  EXPECT_FALSE(client.last_receive_timed_out());
+
+  client.close();
+  ::close(listener);
+}
+
 TEST(TcpSocket, SendReturnsWhenPeerStopsReading) {
   const int listener = ::socket(AF_INET, SOCK_STREAM, 0);
   ASSERT_GE(listener, 0);

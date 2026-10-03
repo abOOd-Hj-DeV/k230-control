@@ -1,5 +1,6 @@
 #include "k230/bridge/layout_receiver.hpp"
 
+#include <algorithm>
 #include <array>
 #include <chrono>
 #include <fstream>
@@ -10,13 +11,15 @@
 namespace k230::bridge {
 namespace {
 bool receive(TcpSocket& socket, std::uint8_t* data, std::size_t size, const std::atomic<bool>& stop) {
-  const auto deadline = std::chrono::steady_clock::now() + std::chrono::milliseconds(500);
+  const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(6);
   std::size_t done = 0;
   while (!stop && done < size) {
     const auto remaining = std::chrono::duration_cast<std::chrono::milliseconds>(
         deadline - std::chrono::steady_clock::now()).count();
     if (remaining <= 0) return false;
-    const long got = socket.recv(data + done, size - done, static_cast<int>(remaining));
+    const int wait = static_cast<int>(std::min<std::int64_t>(remaining, 500));
+    const long got = socket.recv(data + done, size - done, wait);
+    if (got < 0 && socket.last_receive_timed_out()) continue;
     if (got <= 0) return false;
     done += static_cast<std::size_t>(got);
   }
