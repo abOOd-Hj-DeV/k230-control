@@ -1,0 +1,405 @@
+{
+  "contract": "mentor-parental-v2.0",
+  "cases": [
+    {
+      "name": "10_sexy_only",
+      "age": 10,
+      "porn": 0,
+      "hentai": 0,
+      "sexy": 1,
+      "count": 11,
+      "spacing_us": 100000,
+      "expected_stage": 0
+    },
+    {
+      "name": "10_cover_inclusive",
+      "age": 10,
+      "porn": 0.6,
+      "hentai": 0,
+      "sexy": 0,
+      "count": 3,
+      "spacing_us": 200000,
+      "expected_stage": 1
+    },
+    {
+      "name": "10_cover_too_short",
+      "age": 10,
+      "porn": 0.6,
+      "hentai": 0,
+      "sexy": 0,
+      "count": 3,
+      "spacing_us": 100000,
+      "expected_stage": 0
+    },
+    {
+      "name": "10_shield_inclusive",
+      "age": 10,
+      "porn": 0.8,
+      "hentai": 0,
+      "sexy": 0,
+      "count": 3,
+      "spacing_us": 200000,
+      "expected_stage": 2
+    },
+    {
+      "name": "10_exit_first_action",
+      "age": 10,
+      "porn": 0.9,
+      "hentai": 0,
+      "sexy": 0,
+      "count": 11,
+      "spacing_us": 100000,
+      "expected_stage": 3
+    },
+    {
+      "name": "10_exit_five_too_short",
+      "age": 10,
+      "porn": 0.9,
+      "hentai": 0,
+      "sexy": 0,
+      "count": 5,
+      "spacing_us": 100000,
+      "expected_stage": 0
+    },
+    {
+      "name": "10_hentai_strict_boundary",
+      "age": 10,
+      "porn": 0,
+      "hentai": 0.6,
+      "sexy": 0,
+      "count": 11,
+      "spacing_us": 100000,
+      "expected_stage": 0
+    },
+    {
+      "name": "10_hentai_shield_never_home",
+      "age": 10,
+      "porn": 0.01,
+      "hentai": 0.98,
+      "sexy": 0,
+      "count": 11,
+      "spacing_us": 100000,
+      "expected_stage": 2
+    },
+    {
+      "name": "10_low_porn_cannot_home",
+      "age": 10,
+      "porn": 0.599999,
+      "hentai": 0.4,
+      "sexy": 0,
+      "count": 11,
+      "spacing_us": 100000,
+      "expected_stage": 2
+    },
+    {
+      "name": "10_porn_point_six_can_home",
+      "age": 10,
+      "porn": 0.6,
+      "hentai": 0.39,
+      "sexy": 0,
+      "count": 11,
+      "spacing_us": 100000,
+      "expected_stage": 3
+    },
+    {
+      "name": "12_sexy_only",
+      "age": 12,
+      "porn": 0,
+      "hentai": 0,
+      "sexy": 1,
+      "count": 11,
+      "spacing_us": 100000,
+      "expected_stage": 0
+    },
+    {
+      "name": "12_cover_inclusive",
+      "age": 12,
+      "porn": 0.6,
+      "hentai": 0,
+      "sexy": 0,
+      "count": 3,
+      "spacing_us": 200000,
+      "expected_stage": 1
+    },
+    {
+      "name": "12_cover_too_short",
+      "age": 12,
+      "porn": 0.6,
+      "hentai": 0,
+      "sexy": 0,
+      "count": 3,
+      "spacing_us": 100000,
+      "expected_stage": 0
+    },
+    {
+      "name": "12_shield_inclusive",
+      "age": 12,
+      "porn": 0.8,
+      "hentai": 0,
+      "sexy": 0,
+      "count": 3,
+      "spacing_us": 200000,
+      "expected_stage": 2
+    },
+    {
+      "name": "12_exit_first_action",
+      "age": 12,
+      "porn": 0.9,
+      "hentai": 0,
+      "sexy": 0,
+      "count": 11,
+      "spacing_us": 100000,
+      "expected_stage": 3
+    },
+    {
+      "name": "12_exit_five_too_short",
+      "age": 12,
+      "porn": 0.9,
+      "hentai": 0,
+      "sexy": 0,
+      "count": 5,
+      "spacing_us": 100000,
+      "expected_stage": 0
+    },
+    {
+      "name": "12_hentai_strict_boundary",
+      "age": 12,
+      "porn": 0,
+      "hentai": 0.6,
+      "sexy": 0,
+      "count": 11,
+      "spacing_us": 100000,
+      "expected_stage": 0
+    },
+    {
+      "name": "12_hentai_shield_never_home",
+      "age": 12,
+      "porn": 0.01,
+      "hentai": 0.98,
+      "sexy": 0,
+      "count": 11,
+      "spacing_us": 100000,
+      "expected_stage": 2
+    },
+    {
+      "name": "12_low_porn_cannot_home",
+      "age": 12,
+      "porn": 0.599999,
+      "hentai": 0.4,
+      "sexy": 0,
+      "count": 11,
+      "spacing_us": 100000,
+      "expected_stage": 2
+    },
+    {
+      "name": "12_porn_point_six_can_home",
+      "age": 12,
+      "porn": 0.6,
+      "hentai": 0.39,
+      "sexy": 0,
+      "count": 11,
+      "spacing_us": 100000,
+      "expected_stage": 3
+    },
+    {
+      "name": "13_sexy_only",
+      "age": 13,
+      "porn": 0,
+      "hentai": 0,
+      "sexy": 1,
+      "count": 11,
+      "spacing_us": 100000,
+      "expected_stage": 0
+    },
+    {
+      "name": "13_cover_inclusive",
+      "age": 13,
+      "porn": 0.7,
+      "hentai": 0,
+      "sexy": 0,
+      "count": 3,
+      "spacing_us": 200000,
+      "expected_stage": 1
+    },
+    {
+      "name": "13_cover_too_short",
+      "age": 13,
+      "porn": 0.7,
+      "hentai": 0,
+      "sexy": 0,
+      "count": 3,
+      "spacing_us": 100000,
+      "expected_stage": 0
+    },
+    {
+      "name": "13_shield_inclusive",
+      "age": 13,
+      "porn": 0.85,
+      "hentai": 0,
+      "sexy": 0,
+      "count": 3,
+      "spacing_us": 200000,
+      "expected_stage": 2
+    },
+    {
+      "name": "13_exit_first_action",
+      "age": 13,
+      "porn": 0.95,
+      "hentai": 0,
+      "sexy": 0,
+      "count": 11,
+      "spacing_us": 100000,
+      "expected_stage": 3
+    },
+    {
+      "name": "13_exit_five_too_short",
+      "age": 13,
+      "porn": 0.95,
+      "hentai": 0,
+      "sexy": 0,
+      "count": 5,
+      "spacing_us": 100000,
+      "expected_stage": 0
+    },
+    {
+      "name": "13_hentai_strict_boundary",
+      "age": 13,
+      "porn": 0,
+      "hentai": 0.6,
+      "sexy": 0,
+      "count": 11,
+      "spacing_us": 100000,
+      "expected_stage": 0
+    },
+    {
+      "name": "13_hentai_shield_never_home",
+      "age": 13,
+      "porn": 0.01,
+      "hentai": 0.98,
+      "sexy": 0,
+      "count": 11,
+      "spacing_us": 100000,
+      "expected_stage": 2
+    },
+    {
+      "name": "13_low_porn_cannot_home",
+      "age": 13,
+      "porn": 0.599999,
+      "hentai": 0.4,
+      "sexy": 0,
+      "count": 11,
+      "spacing_us": 100000,
+      "expected_stage": 2
+    },
+    {
+      "name": "13_porn_point_six_can_home",
+      "age": 13,
+      "porn": 0.6,
+      "hentai": 0.39,
+      "sexy": 0,
+      "count": 11,
+      "spacing_us": 100000,
+      "expected_stage": 3
+    },
+    {
+      "name": "15_sexy_only",
+      "age": 15,
+      "porn": 0,
+      "hentai": 0,
+      "sexy": 1,
+      "count": 11,
+      "spacing_us": 100000,
+      "expected_stage": 0
+    },
+    {
+      "name": "15_cover_inclusive",
+      "age": 15,
+      "porn": 0.7,
+      "hentai": 0,
+      "sexy": 0,
+      "count": 3,
+      "spacing_us": 200000,
+      "expected_stage": 1
+    },
+    {
+      "name": "15_cover_too_short",
+      "age": 15,
+      "porn": 0.7,
+      "hentai": 0,
+      "sexy": 0,
+      "count": 3,
+      "spacing_us": 100000,
+      "expected_stage": 0
+    },
+    {
+      "name": "15_shield_inclusive",
+      "age": 15,
+      "porn": 0.85,
+      "hentai": 0,
+      "sexy": 0,
+      "count": 3,
+      "spacing_us": 200000,
+      "expected_stage": 2
+    },
+    {
+      "name": "15_exit_first_action",
+      "age": 15,
+      "porn": 0.95,
+      "hentai": 0,
+      "sexy": 0,
+      "count": 11,
+      "spacing_us": 100000,
+      "expected_stage": 3
+    },
+    {
+      "name": "15_exit_five_too_short",
+      "age": 15,
+      "porn": 0.95,
+      "hentai": 0,
+      "sexy": 0,
+      "count": 5,
+      "spacing_us": 100000,
+      "expected_stage": 0
+    },
+    {
+      "name": "15_hentai_strict_boundary",
+      "age": 15,
+      "porn": 0,
+      "hentai": 0.6,
+      "sexy": 0,
+      "count": 11,
+      "spacing_us": 100000,
+      "expected_stage": 0
+    },
+    {
+      "name": "15_hentai_shield_never_home",
+      "age": 15,
+      "porn": 0.01,
+      "hentai": 0.98,
+      "sexy": 0,
+      "count": 11,
+      "spacing_us": 100000,
+      "expected_stage": 2
+    },
+    {
+      "name": "15_low_porn_cannot_home",
+      "age": 15,
+      "porn": 0.599999,
+      "hentai": 0.4,
+      "sexy": 0,
+      "count": 11,
+      "spacing_us": 100000,
+      "expected_stage": 2
+    },
+    {
+      "name": "15_porn_point_six_can_home",
+      "age": 15,
+      "porn": 0.6,
+      "hentai": 0.39,
+      "sexy": 0,
+      "count": 11,
+      "spacing_us": 100000,
+      "expected_stage": 3
+    }
+  ]
+}

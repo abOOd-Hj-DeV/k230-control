@@ -68,6 +68,10 @@ int main(int argc, char** argv) {
     return 0;
   }
   if (cli.has("verbose")) log::threshold() = log::Level::Debug;
+  if (cli.has("protection-v2")) {
+    K230_LOG_ERROR("bridge") << "standalone v2 enforcement unsupported: no verified bounded bidirectional SDK adapter";
+    return 1;
+  }
 
   bridge::ScrcpyConfig cfg;
   cfg.server_jar = cli.get("server-jar", cfg.server_jar);

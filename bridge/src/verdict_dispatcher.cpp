@@ -15,7 +15,7 @@ VerdictDispatcher::VerdictDispatcher(CompanionConfig config, AdbController adb, 
 VerdictDispatcher::~VerdictDispatcher() { stop(); }
 
 bool VerdictDispatcher::start() {
-  if (!serial_.empty() &&
+  if (!config_.local_only && !serial_.empty() &&
       !adb_.forward(serial_, config_.local_port, "localabstract:" + config_.abstract_socket)) {
     K230_LOG_WARN(kTag) << "could not forward companion socket; verdicts will only be logged";
   }
@@ -28,7 +28,7 @@ void VerdictDispatcher::stop() {
   stop_ = true;
   if (thread_.joinable()) thread_.join();
   socket_.close();
-  if (!serial_.empty()) {
+  if (!config_.local_only && !serial_.empty()) {
     adb_.forward_remove(serial_, config_.local_port);
     serial_.clear();
   }
@@ -61,7 +61,7 @@ void VerdictDispatcher::loop() {
       continue;
     }
     if (observer_) observer_(*verdict);
-    if (verdict->action < config_.min_action) continue;
+    if (config_.local_only || verdict->action < config_.min_action) continue;
 
     const std::string line = to_json_line(*verdict);
     if (ensure_connected() && socket_.send_all(line)) {

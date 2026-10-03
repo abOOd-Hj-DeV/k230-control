@@ -1,6 +1,8 @@
 #include <chrono>
 #include <cstdint>
 #include <vector>
+#include <future>
+#include <thread>
 
 #include <arpa/inet.h>
 #include <netinet/in.h>
@@ -73,4 +75,31 @@ TEST(TcpSocket, SendReturnsWhenPeerStopsReading) {
   client.close();
   ::close(peer);
   ::close(listener);
+}
+
+TEST(TcpSocket, TrickleBytesCannotRenewAbsoluteReadDeadline) {
+  const int listener = ::socket(AF_INET, SOCK_STREAM, 0);
+  ASSERT_GE(listener, 0);
+  sockaddr_in address{};
+  address.sin_family = AF_INET;
+  address.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
+  ASSERT_EQ(::bind(listener, reinterpret_cast<sockaddr*>(&address), sizeof(address)), 0);
+  ASSERT_EQ(::listen(listener, 1), 0);
+  socklen_t size = sizeof(address);
+  ASSERT_EQ(::getsockname(listener, reinterpret_cast<sockaddr*>(&address), &size), 0);
+  TcpSocket client;
+  ASSERT_TRUE(client.connect("127.0.0.1", ntohs(address.sin_port)));
+  const int peer = ::accept(listener, nullptr, nullptr);
+  ASSERT_GE(peer, 0);
+  auto sender = std::async(std::launch::async, [&] {
+    for (int i = 0; i < 10; ++i) {
+      if (::send(peer, "x", 1, MSG_NOSIGNAL) != 1) break;
+      std::this_thread::sleep_for(std::chrono::milliseconds(30));
+    }
+  });
+  std::uint8_t bytes[10]{};
+  const auto start = std::chrono::steady_clock::now();
+  EXPECT_FALSE(client.recv_exact(bytes, sizeof(bytes), 100));
+  EXPECT_LT(std::chrono::steady_clock::now() - start, std::chrono::milliseconds(250));
+  client.close(); sender.get(); ::close(peer); ::close(listener);
 }

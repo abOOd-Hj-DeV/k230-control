@@ -3,6 +3,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <string>
+#include <atomic>
 
 namespace k230::bridge {
 
@@ -33,7 +34,8 @@ class TcpSocket {
   void shutdown();
 
  private:
-  int fd_ = -1;
+  std::atomic<int> fd_{-1};
+  int send_timeout_ms_ = -1;
   bool last_receive_timed_out_ = false;
 };
 

@@ -1,0 +1,14 @@
+{
+  "contract": "mentor-parental-v2.0",
+  "sha256": {
+    "companion.schema.json": "4ef52e70094ae71da92c4ffd467a12f5956d1440067316730bdaa214f2d4141b",
+    "fixtures/ack.json": "7c6fa217088b0edd2000846a609a924970c89256a1cc9d1743ba047253ba1e0d",
+    "fixtures/bind.json": "c91252dd83ac85f9968c3957b0581007ee13f5339a6e98464f53507ffc9e4e90",
+    "fixtures/bound.json": "508dd4faca9645fdb748e0e94c92aac1a8a369d9f50070ad015cf02b9bebeccb",
+    "fixtures/decision.json": "44d2e02ea19a6edeee5ae3df5e81c866f64bf48dd7245b753a72a92397ef4eab",
+    "fixtures/hello.json": "2d45832fa7095abbed2aaca6c62f2ed0c6cc22ed8460c4c89ed309ff65215966",
+    "fixtures/policy-traces.json": "b7c8894d419b034d0a5c621d5d176350a80b7abe2e016846bc07375a73cc6190",
+    "fixtures/released.json": "d3d363e92330749269ee2a33c1993978f5bc2cd7625d96526eec37ab1e2466e9",
+    "fixtures/state.json": "3a33b832aca50c3baae9fe4348def632e7c6b2dbd66c80a5a066c7a543769d1e"
+  }
+}

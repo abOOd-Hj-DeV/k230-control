@@ -7,6 +7,8 @@
 #include <mutex>
 #include <optional>
 
+#include "k230/companion_v2.hpp"
+
 #include "k230/media_packet.hpp"
 #include "k230/verdict.hpp"
 
@@ -43,6 +45,32 @@ using PacketSink = Sink<MediaPacket>;
 using PacketSource = Source<MediaPacket>;
 using VerdictSink = Sink<Verdict>;
 using VerdictSource = Source<Verdict>;
+using ControlSink = Sink<companion::Json>;
+using ControlSource = Source<companion::Json>;
+
+// Control traffic cannot evict an ACK or grow like the media config queue.
+class ControlQueue final : public ControlSink, public ControlSource {
+ public:
+  bool push(companion::Json&& value) override {
+    try { companion::line(value); } catch (const std::exception&) { return false; }
+    std::lock_guard<std::mutex> lock(mutex_);
+    if (closed_ || items_.size() >= 32) return false;
+    items_.push_back(std::move(value)); changed_.notify_one(); return true;
+  }
+  std::optional<companion::Json> pop(std::chrono::milliseconds timeout) override {
+    std::unique_lock<std::mutex> lock(mutex_);
+    changed_.wait_for(lock, timeout, [&] { return closed_ || !items_.empty(); });
+    if (items_.empty()) return std::nullopt;
+    auto result = std::move(items_.front()); items_.pop_front(); return result;
+  }
+  bool closed() const override { std::lock_guard<std::mutex> lock(mutex_); return closed_; }
+  void close() override { std::lock_guard<std::mutex> lock(mutex_); closed_ = true; changed_.notify_all(); }
+ private:
+  mutable std::mutex mutex_;
+  std::condition_variable changed_;
+  std::deque<companion::Json> items_;
+  bool closed_ = false;
+};
 
 // Bounded MPMC queue. When full, the oldest droppable item is evicted so that
 // the newest data always gets through (low latency beats completeness for a

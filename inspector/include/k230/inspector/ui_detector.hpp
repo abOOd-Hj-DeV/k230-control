@@ -23,6 +23,8 @@ struct UiDetectorConfig {
 
 struct UiDetections {
   std::vector<ImageRegion> regions;
+  std::vector<std::string> kinds;
+  bool complete = true;
   std::uint32_t ignored_small = 0;
 };
 

@@ -141,6 +141,10 @@ int main(int argc, char** argv) {
     return 0;
   }
   if (cli.has("verbose")) log::threshold() = log::Level::Debug;
+  if (cli.has("protection-v2")) {
+    K230_LOG_ERROR("inspector") << "standalone v2 enforcement unsupported: SDK bidirectional control/KPU adapter unverified; use PC k230-monitor";
+    return 1;
+  }
 
   PipelineConfig cfg;
   cfg.sync.audio_enabled = !cli.has("no-audio");

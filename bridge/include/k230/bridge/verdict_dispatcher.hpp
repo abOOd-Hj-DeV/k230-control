@@ -23,6 +23,7 @@ struct CompanionConfig {
   int send_timeout_ms = 500;
   // Verdicts with action < min_action are logged locally but not sent.
   Action min_action = Action::Warn;
+  bool local_only = false;
 };
 
 // Consumes verdicts from the big core and forwards them, as JSON lines, to the

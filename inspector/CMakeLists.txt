@@ -3,6 +3,8 @@ set(INSPECTOR_SOURCES
   src/sync_engine.cpp
   src/analyzer.cpp
   src/policy.cpp
+  src/age_policy.cpp
+  src/protection_session.cpp
   src/pipeline.cpp
   src/frame_dump.cpp
   src/raw_pcm_decoder.cpp

@@ -1,0 +1,41 @@
+{
+  "v": 2,
+  "session_id": "10000000-0000-4000-8000-000000000001",
+  "stream_id": "10000000-0000-4000-8000-000000000004",
+  "type": "state",
+  "seq": "2",
+  "phone_time_us": "10400000",
+  "policy": {
+    "policy_version": "age-10-15-v1",
+    "policy_revision": "1",
+    "age": 12,
+    "profile": "10-12"
+  },
+  "screen": {
+    "screen_token": "10000000-0000-4000-8000-000000000002",
+    "content_epoch": "1",
+    "display_id": 0,
+    "width": 1080,
+    "height": 2400,
+    "rotation_deg": 0,
+    "window_id": 7,
+    "package": "com.example.viewer",
+    "sampled_at_us": "10400000",
+    "valid_from_us": "9900000",
+    "status": "verified"
+  },
+  "protection": {
+    "stage": 0,
+    "event_id": null,
+    "applied_at_us": null,
+    "covered_rects": [],
+    "release_pending": false
+  },
+  "health": {
+    "accessibility": true,
+    "keystore": "ready",
+    "pairing": "paired",
+    "outbox_count": 0,
+    "cloud": "offline"
+  }
+}
