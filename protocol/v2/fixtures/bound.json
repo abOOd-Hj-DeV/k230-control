@@ -1,0 +1,11 @@
+{
+  "v": 2,
+  "session_id": "10000000-0000-4000-8000-000000000001",
+  "stream_id": "10000000-0000-4000-8000-000000000004",
+  "type": "bound",
+  "seq": "1",
+  "request_seq": "1",
+  "status": "accepted",
+  "error": null,
+  "phone_time_us": "10010000"
+}

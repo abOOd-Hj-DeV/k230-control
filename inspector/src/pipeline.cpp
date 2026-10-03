@@ -126,6 +126,7 @@ void InspectorPipeline::handle(const MediaPacket& packet) {
     }
     if (stats_.video_packets > 1 && packet.seq != 0 && packet.seq != next_video_seq_) {
       ++stats_.video_gaps;
+      if (vision_) vision_->discontinuity();
       wait_key_frame_ = true;
     }
     next_video_seq_ = packet.seq + 1;
@@ -139,12 +140,14 @@ void InspectorPipeline::handle(const MediaPacket& packet) {
     std::vector<VideoFrame> frames;
     if (!video_decoder_->decode(packet, frames)) {
       K230_LOG_WARN(kTag) << "video decoder failure; waiting for key frame";
+      if (vision_) vision_->discontinuity();
       wait_key_frame_ = true;
       return;
     }
     const std::int64_t now = now_us();
     for (auto& f : frames) {
       ++stats_.frames_decoded;
+      if (capture_pts_observer_) capture_pts_observer_(f.pts_us);
       if (vision_) vision_->submit(f);
       if (capture_) capture_->push_frame(f);
       sync_.push_video(std::move(f), now);

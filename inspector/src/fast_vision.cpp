@@ -94,8 +94,12 @@ void FastVision::submit(VideoFrame frame) {
   std::lock_guard<std::mutex> lock(mutex_);
   if (closing_ || frame.pts_us < 0 || frame.pts_us <= last_pts_us_) return;
   last_pts_us_ = frame.pts_us;
+  if (batch_observer_) {
+    if (selected_pts_ >= 0 && frame.pts_us-selected_pts_ < 100000) return;
+    selected_pts_ = frame.pts_us;
+  }
   ++stats_.submitted;
-  if (pending_) ++stats_.dropped;
+  if (pending_) { ++stats_.dropped; discontinuity_.store(true); }
   pending_ = std::make_shared<VideoFrame>(std::move(frame));
   pending_arrival_ = std::chrono::steady_clock::now();
   changed_.notify_all();
@@ -154,6 +158,7 @@ void FastVision::coordinate() {
       if (!pending_) return;
       work->frame = std::move(pending_);
       work->arrival = pending_arrival_;
+      work->discontinuity = discontinuity_.exchange(false);
     }
     const auto transform_start = std::chrono::steady_clock::now();
     if (detector_) {
@@ -162,6 +167,8 @@ void FastVision::coordinate() {
         auto detected = detector_->detect(*work->frame);
         stats_.ignored_small += detected.ignored_small;
         work->selection.regions = std::move(detected.regions);
+        work->selection.kinds = std::move(detected.kinds);
+        work->selection.complete = detected.complete && !work->selection.regions.empty();
         for (std::size_t i = 0; i < work->selection.regions.size(); ++i) {
           work->selection.ids.push_back(static_cast<std::uint32_t>(i + 1));
         }
@@ -186,7 +193,24 @@ void FastVision::coordinate() {
       changed_.wait(lock, [&] { return work->finished == work->scores.size(); });
     }
     Scores aggregate;
+    AnalysisBatch batch;
+    batch.pts_us = work->frame->pts_us;
+    batch.width = work->frame->width; batch.height = work->frame->height;
+    batch.complete = work->selection.complete && !work->failed;
+    batch.discontinuity = work->discontinuity;
     for (std::size_t i = 0; i < work->scores.size(); ++i) {
+      if (batch_observer_) {
+        auto crop = work->selection.regions[i];
+        RegionObservation region;
+        region.crop = {static_cast<int>(crop.x),static_cast<int>(crop.y),static_cast<int>(crop.width),static_cast<int>(crop.height)};
+        region.kind = i < work->selection.kinds.size() ? work->selection.kinds[i] : "Image";
+        region.complete = work->scores[i] && work->scores[i]->nsfwjs && work->scores[i]->analysis_complete;
+        if (region.complete) {
+          const auto& n = *work->scores[i]->nsfwjs;
+          region.scores = {n.porn,n.hentai,n.sexy};
+        }
+        batch.regions.push_back(region);
+      }
       if (work->scores[i] && (!aggregate.nsfwjs || work->scores[i]->nudity > aggregate.nudity)) {
         aggregate = *work->scores[i];
         aggregate.analysis_region = static_cast<std::uint32_t>(i);
@@ -204,7 +228,7 @@ void FastVision::coordinate() {
     aggregate.analysis_complete = work->selection.complete && !work->failed;
     aggregate.frame_ms = std::chrono::duration<double, std::milli>(
         std::chrono::steady_clock::now() - work->arrival).count();
-    aggregate.analysis_region = 0;
+    if (batch_observer_) batch_observer_(std::move(batch));
     auto verdict = policy_.evaluate(work->frame->pts_us, aggregate);
     if (work->scores.empty()) ++stats_.skipped;
     else ++stats_.analyzed;

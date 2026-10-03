@@ -4,6 +4,7 @@ add_library(k230_bridge STATIC
   src/adb_controller.cpp
   src/scrcpy_session.cpp
   src/verdict_dispatcher.cpp
+  src/companion_dispatcher.cpp
   src/layout_receiver.cpp
 )
 

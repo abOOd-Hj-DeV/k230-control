@@ -2,6 +2,8 @@
 
 #include <cerrno>
 #include <cstring>
+#include <chrono>
+#include <algorithm>
 
 #include <arpa/inet.h>
 #include <fcntl.h>
@@ -17,17 +19,16 @@ namespace k230::bridge {
 TcpSocket::~TcpSocket() { close(); }
 
 TcpSocket::TcpSocket(TcpSocket&& other) noexcept
-    : fd_(other.fd_), last_receive_timed_out_(other.last_receive_timed_out_) {
-  other.fd_ = -1;
+    : fd_(other.fd_.exchange(-1)), send_timeout_ms_(other.send_timeout_ms_), last_receive_timed_out_(other.last_receive_timed_out_) {
   other.last_receive_timed_out_ = false;
 }
 
 TcpSocket& TcpSocket::operator=(TcpSocket&& other) noexcept {
   if (this != &other) {
     close();
-    fd_ = other.fd_;
+    fd_ = other.fd_.exchange(-1);
+    send_timeout_ms_ = other.send_timeout_ms_;
     last_receive_timed_out_ = other.last_receive_timed_out_;
-    other.fd_ = -1;
     other.last_receive_timed_out_ = false;
   }
   return *this;
@@ -76,17 +77,18 @@ bool TcpSocket::connect(const std::string& host, std::uint16_t port, int timeout
 }
 
 void TcpSocket::close() {
-  if (fd_ >= 0) {
-    ::close(fd_);
-    fd_ = -1;
-  }
+  int fd = fd_.exchange(-1);
+  if (fd >= 0) ::close(fd);
+  send_timeout_ms_ = -1;
   last_receive_timed_out_ = false;
 }
 
 bool TcpSocket::set_send_timeout(int timeout_ms) {
   if (fd_ < 0 || timeout_ms <= 0) return false;
   const timeval timeout{timeout_ms / 1000, (timeout_ms % 1000) * 1000};
-  return ::setsockopt(fd_, SOL_SOCKET, SO_SNDTIMEO, &timeout, sizeof(timeout)) == 0;
+  if (::setsockopt(fd_, SOL_SOCKET, SO_SNDTIMEO, &timeout, sizeof(timeout)) != 0) return false;
+  send_timeout_ms_ = timeout_ms;
+  return true;
 }
 
 void TcpSocket::shutdown() {
@@ -113,9 +115,12 @@ long TcpSocket::recv(std::uint8_t* buf, std::size_t len, int timeout_ms) {
 }
 
 bool TcpSocket::recv_exact(std::uint8_t* buf, std::size_t len, int timeout_ms) {
+  const auto deadline = std::chrono::steady_clock::now() + std::chrono::milliseconds(std::max(timeout_ms,0));
   std::size_t got = 0;
   while (got < len) {
-    long n = recv(buf + got, len - got, timeout_ms);
+    int left = timeout_ms < 0 ? -1 : static_cast<int>(std::chrono::duration_cast<std::chrono::milliseconds>(deadline-std::chrono::steady_clock::now()).count());
+    if (timeout_ms >= 0 && left <= 0) return false;
+    long n = recv(buf + got, len - got, left);
     if (n <= 0) return false;
     got += static_cast<std::size_t>(n);
   }
@@ -124,11 +129,20 @@ bool TcpSocket::recv_exact(std::uint8_t* buf, std::size_t len, int timeout_ms) {
 
 bool TcpSocket::send_all(const std::uint8_t* buf, std::size_t len) {
   if (fd_ < 0) return false;
+  const auto deadline = std::chrono::steady_clock::now() + std::chrono::milliseconds(std::max(send_timeout_ms_,0));
   std::size_t sent = 0;
   while (sent < len) {
-    ssize_t n = ::send(fd_, buf + sent, len - sent, MSG_NOSIGNAL);
+    if (send_timeout_ms_ > 0) {
+      auto left = std::chrono::duration_cast<std::chrono::milliseconds>(deadline-std::chrono::steady_clock::now()).count();
+      if (left <= 0) return false;
+      pollfd pfd{fd_,POLLOUT,0};
+      int ready = ::poll(&pfd,1,static_cast<int>(left));
+      if (ready < 0 && errno == EINTR) continue;
+      if (ready <= 0) return false;
+    }
+    ssize_t n = ::send(fd_, buf + sent, len - sent, MSG_NOSIGNAL | (send_timeout_ms_ > 0 ? MSG_DONTWAIT : 0));
     if (n < 0) {
-      if (errno == EINTR) continue;
+      if (errno == EINTR || (send_timeout_ms_ > 0 && (errno == EAGAIN || errno == EWOULDBLOCK))) continue;
       return false;
     }
     if (n == 0) return false;

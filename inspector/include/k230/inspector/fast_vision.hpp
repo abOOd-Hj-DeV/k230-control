@@ -12,6 +12,7 @@
 #include <vector>
 
 #include "k230/inspector/nsfwjs_analyzer.hpp"
+#include "k230/inspector/age_policy.hpp"
 #include "k230/inspector/policy.hpp"
 #include "k230/inspector/ui_detector.hpp"
 #include "k230/ipc/channel.hpp"
@@ -25,6 +26,7 @@ std::optional<ImageRegion> layout_region(const LayoutSnapshot& layout, const Lay
 struct VisionRegions {
   std::vector<ImageRegion> regions;
   std::vector<std::uint32_t> ids;
+  std::vector<std::string> kinds;
   std::uint64_t session = 0;
   std::uint64_t identity = 0, sequence = 0;
   bool complete = false;
@@ -48,6 +50,8 @@ class FastVision {
   void submit(VideoFrame frame);
   void finish();
   void set_observer(Observer observer) { observer_ = std::move(observer); }
+  void set_batch_observer(std::function<void(AnalysisBatch)> observer) { batch_observer_ = std::move(observer); }
+  void discontinuity() { discontinuity_.store(true); }
   const Stats& stats() const { return stats_; }
 
  private:
@@ -56,7 +60,7 @@ class FastVision {
     VisionRegions selection;
     std::vector<std::optional<Scores>> scores;
     std::size_t finished = 0;
-    bool failed = false;
+    bool failed = false, discontinuity = false;
     std::chrono::steady_clock::time_point arrival;
   };
   struct Job { std::shared_ptr<FrameWork> work; std::size_t index; };
@@ -68,6 +72,9 @@ class FastVision {
   Policy policy_;
   std::shared_ptr<ipc::VerdictSink> verdicts_;
   Observer observer_;
+  std::function<void(AnalysisBatch)> batch_observer_;
+  std::atomic<bool> discontinuity_{false};
+  std::int64_t selected_pts_ = -1;
   Stats stats_;
   std::mutex mutex_;
   std::condition_variable changed_;

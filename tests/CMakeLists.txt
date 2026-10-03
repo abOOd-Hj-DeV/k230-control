@@ -15,6 +15,7 @@ add_executable(k230_tests
   adb_test.cpp
   tcp_socket_test.cpp
   scrcpy_stream_test.cpp
+  protection_v2_test.cpp
 )
 target_link_libraries(k230_tests PRIVATE k230_bridge k230_inspector GTest::gtest GTest::gtest_main)
 target_compile_definitions(k230_tests PRIVATE
@@ -22,6 +23,7 @@ target_compile_definitions(k230_tests PRIVATE
   K230_TEST_NSFWJS_MODEL="${PROJECT_SOURCE_DIR}/models/nsfwjs-mobilenet-v2.onnx")
 target_compile_definitions(k230_tests PRIVATE K230_LAYOUT_GOLDEN="${CMAKE_CURRENT_SOURCE_DIR}/fixtures/layout-kotlin-v1.bin")
 target_compile_definitions(k230_tests PRIVATE K230_LAYOUT_LIVE="${CMAKE_CURRENT_SOURCE_DIR}/fixtures/layout-android-api35.bin")
+target_compile_definitions(k230_tests PRIVATE K230_V2_FIXTURES="${PROJECT_SOURCE_DIR}/protocol/v2/fixtures")
 
 include(GoogleTest)
 gtest_discover_tests(k230_tests)

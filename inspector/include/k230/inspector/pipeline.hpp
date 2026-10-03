@@ -52,6 +52,7 @@ class InspectorPipeline {
 
   void set_observer(SampleObserver observer) { observer_ = std::move(observer); }
   void set_vision(std::unique_ptr<FastVision> vision) { vision_ = std::move(vision); }
+  void set_capture_pts_observer(std::function<void(std::int64_t)> observer) { capture_pts_observer_ = std::move(observer); }
 
   // Blocks until the source is closed and drained, or request_stop() is called.
   bool run();
@@ -79,6 +80,7 @@ class InspectorPipeline {
   std::unique_ptr<ContinuousCapture> capture_;
   std::unique_ptr<FastVision> vision_;
   SampleObserver observer_;
+  std::function<void(std::int64_t)> capture_pts_observer_;
   std::atomic<bool> stop_{false};
   bool video_open_ = false;
   bool wait_key_frame_ = false;

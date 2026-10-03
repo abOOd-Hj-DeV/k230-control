@@ -1,0 +1,2202 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:mentor:parental:v2:companion",
+  "title": "mentor-parental-v2.0",
+  "oneOf": [
+    {
+      "type": "object",
+      "properties": {
+        "v": {
+          "enum": [
+            2
+          ]
+        },
+        "type": {
+          "enum": [
+            "hello"
+          ]
+        },
+        "session_id": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+        },
+        "phone_boot_id": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+        },
+        "versions": {
+          "type": "array",
+          "items": {
+            "enum": [
+              2
+            ]
+          },
+          "minItems": 1,
+          "maxItems": 1
+        },
+        "max_line_bytes": {
+          "enum": [
+            16384
+          ]
+        },
+        "phone_time_us": {
+          "type": "string",
+          "pattern": "^(0|[1-9][0-9]{0,18})$",
+          "maxLength": 19
+        },
+        "clock": {
+          "enum": [
+            "android_system_nano_time_us"
+          ]
+        },
+        "capabilities": {
+          "type": "array",
+          "items": {
+            "enum": [
+              "cover_region",
+              "calm_shield",
+              "home"
+            ]
+          },
+          "minItems": 0,
+          "maxItems": 3,
+          "uniqueItems": true
+        },
+        "policy": {
+          "anyOf": [
+            {
+              "type": "null"
+            },
+            {
+              "type": "object",
+              "properties": {
+                "policy_version": {
+                  "enum": [
+                    "age-10-15-v1"
+                  ]
+                },
+                "policy_revision": {
+                  "type": "string",
+                  "pattern": "^[1-9][0-9]{0,18}$",
+                  "maxLength": 19
+                },
+                "age": {
+                  "type": "integer",
+                  "minimum": 10,
+                  "maximum": 15
+                },
+                "profile": {
+                  "enum": [
+                    "10-12",
+                    "13-15"
+                  ]
+                }
+              },
+              "required": [
+                "policy_version",
+                "policy_revision",
+                "age",
+                "profile"
+              ],
+              "additionalProperties": false,
+              "allOf": [
+                {
+                  "if": {
+                    "properties": {
+                      "age": {
+                        "maximum": 12
+                      }
+                    }
+                  },
+                  "then": {
+                    "properties": {
+                      "profile": {
+                        "enum": [
+                          "10-12"
+                        ]
+                      }
+                    }
+                  },
+                  "else": {
+                    "properties": {
+                      "profile": {
+                        "enum": [
+                          "13-15"
+                        ]
+                      }
+                    }
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        "screen": {
+          "anyOf": [
+            {
+              "type": "null"
+            },
+            {
+              "type": "object",
+              "properties": {
+                "screen_token": {
+                  "type": "string",
+                  "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+                },
+                "content_epoch": {
+                  "type": "string",
+                  "pattern": "^[1-9][0-9]{0,18}$",
+                  "maxLength": 19
+                },
+                "display_id": {
+                  "enum": [
+                    0
+                  ]
+                },
+                "width": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 16384
+                },
+                "height": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 16384
+                },
+                "rotation_deg": {
+                  "type": "integer",
+                  "enum": [
+                    0,
+                    90,
+                    180,
+                    270
+                  ]
+                },
+                "window_id": {
+                  "type": "integer",
+                  "minimum": -1,
+                  "maximum": 2147483647
+                },
+                "package": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "maxLength": 255,
+                      "pattern": "^[A-Za-z_][A-Za-z0-9_]*(\\.[A-Za-z_][A-Za-z0-9_]*)*$"
+                    },
+                    {
+                      "enum": [
+                        ""
+                      ]
+                    }
+                  ]
+                },
+                "sampled_at_us": {
+                  "type": "string",
+                  "pattern": "^(0|[1-9][0-9]{0,18})$",
+                  "maxLength": 19
+                },
+                "valid_from_us": {
+                  "type": "string",
+                  "pattern": "^(0|[1-9][0-9]{0,18})$",
+                  "maxLength": 19
+                },
+                "status": {
+                  "enum": [
+                    "verified",
+                    "invalid",
+                    "locked",
+                    "unsupported"
+                  ]
+                }
+              },
+              "required": [
+                "screen_token",
+                "content_epoch",
+                "display_id",
+                "width",
+                "height",
+                "rotation_deg",
+                "window_id",
+                "package",
+                "sampled_at_us",
+                "valid_from_us",
+                "status"
+              ],
+              "additionalProperties": false,
+              "allOf": [
+                {
+                  "if": {
+                    "properties": {
+                      "status": {
+                        "enum": [
+                          "verified"
+                        ]
+                      }
+                    }
+                  },
+                  "then": {
+                    "properties": {
+                      "package": {
+                        "type": "string",
+                        "maxLength": 255,
+                        "pattern": "^[A-Za-z_][A-Za-z0-9_]*(\\.[A-Za-z_][A-Za-z0-9_]*)*$"
+                      },
+                      "window_id": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 2147483647
+                      }
+                    }
+                  }
+                }
+              ]
+            }
+          ]
+        }
+      },
+      "required": [
+        "v",
+        "type",
+        "session_id",
+        "phone_boot_id",
+        "versions",
+        "max_line_bytes",
+        "phone_time_us",
+        "clock",
+        "capabilities",
+        "policy",
+        "screen"
+      ],
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "properties": {
+        "v": {
+          "enum": [
+            2
+          ]
+        },
+        "type": {
+          "enum": [
+            "bind"
+          ]
+        },
+        "session_id": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+        },
+        "seq": {
+          "type": "string",
+          "pattern": "^[1-9][0-9]{0,18}$",
+          "maxLength": 19
+        },
+        "stream_id": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+        },
+        "pts_clock": {
+          "enum": [
+            "android_system_nano_time_us"
+          ]
+        },
+        "capture_pts_us": {
+          "anyOf": [
+            {
+              "type": "null"
+            },
+            {
+              "type": "string",
+              "pattern": "^(0|[1-9][0-9]{0,18})$",
+              "maxLength": 19
+            }
+          ]
+        },
+        "capture": {
+          "type": "object",
+          "properties": {
+            "source": {
+              "enum": [
+                "scrcpy-4.0-display"
+              ]
+            },
+            "display_id": {
+              "enum": [
+                0
+              ]
+            },
+            "mirror": {
+              "enum": [
+                false
+              ]
+            },
+            "custom_crop": {
+              "enum": [
+                false
+              ]
+            },
+            "custom_rotation": {
+              "enum": [
+                false
+              ]
+            }
+          },
+          "required": [
+            "source",
+            "display_id",
+            "mirror",
+            "custom_crop",
+            "custom_rotation"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "required": [
+        "v",
+        "type",
+        "session_id",
+        "seq",
+        "stream_id",
+        "pts_clock",
+        "capture_pts_us",
+        "capture"
+      ],
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "properties": {
+        "v": {
+          "enum": [
+            2
+          ]
+        },
+        "type": {
+          "enum": [
+            "bound"
+          ]
+        },
+        "session_id": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+        },
+        "seq": {
+          "type": "string",
+          "pattern": "^[1-9][0-9]{0,18}$",
+          "maxLength": 19
+        },
+        "stream_id": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+        },
+        "request_seq": {
+          "type": "string",
+          "pattern": "^[1-9][0-9]{0,18}$",
+          "maxLength": 19
+        },
+        "status": {
+          "enum": [
+            "pending",
+            "accepted",
+            "rejected"
+          ]
+        },
+        "error": {
+          "anyOf": [
+            {
+              "type": "null"
+            },
+            {
+              "enum": [
+                "unsupported_version",
+                "malformed_json",
+                "bounds",
+                "invalid_age",
+                "policy_mismatch",
+                "session_mismatch",
+                "stream_mismatch",
+                "stale",
+                "future_pts",
+                "clock_unverified",
+                "wrong_screen",
+                "invalid_transform",
+                "invalid_scores",
+                "invalid_evidence",
+                "hentai_stage3_forbidden",
+                "capability_missing",
+                "permission_missing",
+                "locked",
+                "action_failed",
+                "home_unverified",
+                "event_conflict",
+                "rate_limited",
+                "busy",
+                "storage_failed"
+              ]
+            }
+          ]
+        },
+        "phone_time_us": {
+          "type": "string",
+          "pattern": "^(0|[1-9][0-9]{0,18})$",
+          "maxLength": 19
+        }
+      },
+      "required": [
+        "v",
+        "type",
+        "session_id",
+        "seq",
+        "stream_id",
+        "request_seq",
+        "status",
+        "error",
+        "phone_time_us"
+      ],
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "status": {
+                "enum": [
+                  "rejected"
+                ]
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "error": {
+                "enum": [
+                  "unsupported_version",
+                  "malformed_json",
+                  "bounds",
+                  "invalid_age",
+                  "policy_mismatch",
+                  "session_mismatch",
+                  "stream_mismatch",
+                  "stale",
+                  "future_pts",
+                  "clock_unverified",
+                  "wrong_screen",
+                  "invalid_transform",
+                  "invalid_scores",
+                  "invalid_evidence",
+                  "hentai_stage3_forbidden",
+                  "capability_missing",
+                  "permission_missing",
+                  "locked",
+                  "action_failed",
+                  "home_unverified",
+                  "event_conflict",
+                  "rate_limited",
+                  "busy",
+                  "storage_failed"
+                ]
+              }
+            }
+          },
+          "else": {
+            "properties": {
+              "error": {
+                "type": "null"
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "type": "object",
+      "properties": {
+        "v": {
+          "enum": [
+            2
+          ]
+        },
+        "type": {
+          "enum": [
+            "state"
+          ]
+        },
+        "session_id": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+        },
+        "seq": {
+          "type": "string",
+          "pattern": "^[1-9][0-9]{0,18}$",
+          "maxLength": 19
+        },
+        "stream_id": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+        },
+        "phone_time_us": {
+          "type": "string",
+          "pattern": "^(0|[1-9][0-9]{0,18})$",
+          "maxLength": 19
+        },
+        "policy": {
+          "anyOf": [
+            {
+              "type": "null"
+            },
+            {
+              "type": "object",
+              "properties": {
+                "policy_version": {
+                  "enum": [
+                    "age-10-15-v1"
+                  ]
+                },
+                "policy_revision": {
+                  "type": "string",
+                  "pattern": "^[1-9][0-9]{0,18}$",
+                  "maxLength": 19
+                },
+                "age": {
+                  "type": "integer",
+                  "minimum": 10,
+                  "maximum": 15
+                },
+                "profile": {
+                  "enum": [
+                    "10-12",
+                    "13-15"
+                  ]
+                }
+              },
+              "required": [
+                "policy_version",
+                "policy_revision",
+                "age",
+                "profile"
+              ],
+              "additionalProperties": false,
+              "allOf": [
+                {
+                  "if": {
+                    "properties": {
+                      "age": {
+                        "maximum": 12
+                      }
+                    }
+                  },
+                  "then": {
+                    "properties": {
+                      "profile": {
+                        "enum": [
+                          "10-12"
+                        ]
+                      }
+                    }
+                  },
+                  "else": {
+                    "properties": {
+                      "profile": {
+                        "enum": [
+                          "13-15"
+                        ]
+                      }
+                    }
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        "screen": {
+          "anyOf": [
+            {
+              "type": "null"
+            },
+            {
+              "type": "object",
+              "properties": {
+                "screen_token": {
+                  "type": "string",
+                  "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+                },
+                "content_epoch": {
+                  "type": "string",
+                  "pattern": "^[1-9][0-9]{0,18}$",
+                  "maxLength": 19
+                },
+                "display_id": {
+                  "enum": [
+                    0
+                  ]
+                },
+                "width": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 16384
+                },
+                "height": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 16384
+                },
+                "rotation_deg": {
+                  "type": "integer",
+                  "enum": [
+                    0,
+                    90,
+                    180,
+                    270
+                  ]
+                },
+                "window_id": {
+                  "type": "integer",
+                  "minimum": -1,
+                  "maximum": 2147483647
+                },
+                "package": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "maxLength": 255,
+                      "pattern": "^[A-Za-z_][A-Za-z0-9_]*(\\.[A-Za-z_][A-Za-z0-9_]*)*$"
+                    },
+                    {
+                      "enum": [
+                        ""
+                      ]
+                    }
+                  ]
+                },
+                "sampled_at_us": {
+                  "type": "string",
+                  "pattern": "^(0|[1-9][0-9]{0,18})$",
+                  "maxLength": 19
+                },
+                "valid_from_us": {
+                  "type": "string",
+                  "pattern": "^(0|[1-9][0-9]{0,18})$",
+                  "maxLength": 19
+                },
+                "status": {
+                  "enum": [
+                    "verified",
+                    "invalid",
+                    "locked",
+                    "unsupported"
+                  ]
+                }
+              },
+              "required": [
+                "screen_token",
+                "content_epoch",
+                "display_id",
+                "width",
+                "height",
+                "rotation_deg",
+                "window_id",
+                "package",
+                "sampled_at_us",
+                "valid_from_us",
+                "status"
+              ],
+              "additionalProperties": false,
+              "allOf": [
+                {
+                  "if": {
+                    "properties": {
+                      "status": {
+                        "enum": [
+                          "verified"
+                        ]
+                      }
+                    }
+                  },
+                  "then": {
+                    "properties": {
+                      "package": {
+                        "type": "string",
+                        "maxLength": 255,
+                        "pattern": "^[A-Za-z_][A-Za-z0-9_]*(\\.[A-Za-z_][A-Za-z0-9_]*)*$"
+                      },
+                      "window_id": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 2147483647
+                      }
+                    }
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        "protection": {
+          "type": "object",
+          "properties": {
+            "stage": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 3
+            },
+            "event_id": {
+              "anyOf": [
+                {
+                  "type": "null"
+                },
+                {
+                  "type": "string",
+                  "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+                }
+              ]
+            },
+            "action_revision": {
+              "anyOf": [
+                {
+                  "type": "null"
+                },
+                {
+                  "type": "string",
+                  "pattern": "^[1-9][0-9]{0,18}$",
+                  "maxLength": 19
+                }
+              ]
+            },
+            "target_screen_token": {
+              "anyOf": [
+                {
+                  "type": "null"
+                },
+                {
+                  "type": "string",
+                  "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+                }
+              ]
+            },
+            "applied_at_us": {
+              "anyOf": [
+                {
+                  "type": "null"
+                },
+                {
+                  "type": "string",
+                  "pattern": "^(0|[1-9][0-9]{0,18})$",
+                  "maxLength": 19
+                }
+              ]
+            },
+            "covered_rects": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "x": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 16384
+                  },
+                  "y": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 16384
+                  },
+                  "width": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 16384
+                  },
+                  "height": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 16384
+                  }
+                },
+                "required": [
+                  "x",
+                  "y",
+                  "width",
+                  "height"
+                ],
+                "additionalProperties": false
+              },
+              "minItems": 0,
+              "maxItems": 8
+            },
+            "release_pending": {
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "stage",
+            "event_id",
+            "action_revision",
+            "target_screen_token",
+            "applied_at_us",
+            "covered_rects",
+            "release_pending"
+          ],
+          "additionalProperties": false,
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "stage": {
+                    "enum": [
+                      0
+                    ]
+                  }
+                }
+              },
+              "then": {
+                "properties": {
+                  "event_id": {
+                    "type": "null"
+                  },
+                  "action_revision": {
+                    "type": "null"
+                  },
+                  "target_screen_token": {
+                    "type": "null"
+                  },
+                  "applied_at_us": {
+                    "type": "null"
+                  },
+                  "covered_rects": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "x": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 16384
+                        },
+                        "y": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 16384
+                        },
+                        "width": {
+                          "type": "integer",
+                          "minimum": 1,
+                          "maximum": 16384
+                        },
+                        "height": {
+                          "type": "integer",
+                          "minimum": 1,
+                          "maximum": 16384
+                        }
+                      },
+                      "required": [
+                        "x",
+                        "y",
+                        "width",
+                        "height"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "minItems": 0,
+                    "maxItems": 0
+                  }
+                }
+              },
+              "else": {
+                "properties": {
+                  "event_id": {
+                    "type": "string",
+                    "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+                  },
+                  "action_revision": {
+                    "type": "string",
+                    "pattern": "^[1-9][0-9]{0,18}$",
+                    "maxLength": 19
+                  },
+                  "target_screen_token": {
+                    "type": "string",
+                    "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+                  },
+                  "applied_at_us": {
+                    "type": "string",
+                    "pattern": "^(0|[1-9][0-9]{0,18})$",
+                    "maxLength": 19
+                  }
+                }
+              }
+            }
+          ]
+        },
+        "health": {
+          "type": "object",
+          "properties": {
+            "accessibility": {
+              "type": "boolean"
+            },
+            "keystore": {
+              "enum": [
+                "ready",
+                "locked",
+                "failed"
+              ]
+            },
+            "pairing": {
+              "enum": [
+                "paired",
+                "unpaired",
+                "revoked",
+                "key_lost"
+              ]
+            },
+            "outbox_count": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 10000
+            },
+            "cloud": {
+              "enum": [
+                "online",
+                "offline",
+                "unconfigured",
+                "auth_error"
+              ]
+            }
+          },
+          "required": [
+            "accessibility",
+            "keystore",
+            "pairing",
+            "outbox_count",
+            "cloud"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "required": [
+        "v",
+        "type",
+        "session_id",
+        "seq",
+        "stream_id",
+        "phone_time_us",
+        "policy",
+        "screen",
+        "protection",
+        "health"
+      ],
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "properties": {
+        "v": {
+          "enum": [
+            2
+          ]
+        },
+        "type": {
+          "enum": [
+            "decision"
+          ]
+        },
+        "session_id": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+        },
+        "seq": {
+          "type": "string",
+          "pattern": "^[1-9][0-9]{0,18}$",
+          "maxLength": 19
+        },
+        "stream_id": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+        },
+        "event_id": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+        },
+        "action_revision": {
+          "type": "string",
+          "pattern": "^[1-9][0-9]{0,18}$",
+          "maxLength": 19
+        },
+        "pts_us": {
+          "type": "string",
+          "pattern": "^(0|[1-9][0-9]{0,18})$",
+          "maxLength": 19
+        },
+        "expires_at_us": {
+          "type": "string",
+          "pattern": "^(0|[1-9][0-9]{0,18})$",
+          "maxLength": 19
+        },
+        "screen_token": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+        },
+        "content_epoch": {
+          "type": "string",
+          "pattern": "^[1-9][0-9]{0,18}$",
+          "maxLength": 19
+        },
+        "package": {
+          "type": "string",
+          "maxLength": 255,
+          "pattern": "^[A-Za-z_][A-Za-z0-9_]*(\\.[A-Za-z_][A-Za-z0-9_]*)*$"
+        },
+        "window_id": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 2147483647
+        },
+        "policy": {
+          "type": "object",
+          "properties": {
+            "policy_version": {
+              "enum": [
+                "age-10-15-v1"
+              ]
+            },
+            "policy_revision": {
+              "type": "string",
+              "pattern": "^[1-9][0-9]{0,18}$",
+              "maxLength": 19
+            },
+            "age": {
+              "type": "integer",
+              "minimum": 10,
+              "maximum": 15
+            },
+            "profile": {
+              "enum": [
+                "10-12",
+                "13-15"
+              ]
+            }
+          },
+          "required": [
+            "policy_version",
+            "policy_revision",
+            "age",
+            "profile"
+          ],
+          "additionalProperties": false,
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "age": {
+                    "maximum": 12
+                  }
+                }
+              },
+              "then": {
+                "properties": {
+                  "profile": {
+                    "enum": [
+                      "10-12"
+                    ]
+                  }
+                }
+              },
+              "else": {
+                "properties": {
+                  "profile": {
+                    "enum": [
+                      "13-15"
+                    ]
+                  }
+                }
+              }
+            }
+          ]
+        },
+        "frame": {
+          "type": "object",
+          "properties": {
+            "width": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 16384
+            },
+            "height": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 16384
+            },
+            "display_rotation_deg": {
+              "type": "integer",
+              "enum": [
+                0,
+                90,
+                180,
+                270
+              ]
+            }
+          },
+          "required": [
+            "width",
+            "height",
+            "display_rotation_deg"
+          ],
+          "additionalProperties": false
+        },
+        "transform": {
+          "type": "object",
+          "properties": {
+            "rotation_cw_deg": {
+              "enum": [
+                0
+              ]
+            },
+            "viewport_display_px": {
+              "type": "object",
+              "properties": {
+                "x": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 16384
+                },
+                "y": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 16384
+                },
+                "width": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 16384
+                },
+                "height": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 16384
+                }
+              },
+              "required": [
+                "x",
+                "y",
+                "width",
+                "height"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "rotation_cw_deg",
+            "viewport_display_px"
+          ],
+          "additionalProperties": false
+        },
+        "requested_stage": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 3
+        },
+        "requested_action": {
+          "enum": [
+            "cover_region",
+            "calm_shield",
+            "home"
+          ]
+        },
+        "reason": {
+          "enum": [
+            "threshold",
+            "repetition"
+          ]
+        },
+        "regions": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "track_id": {
+                "type": "string",
+                "pattern": "^[1-9][0-9]{0,18}$",
+                "maxLength": 19
+              },
+              "kind": {
+                "enum": [
+                  "Image",
+                  "BackgroundImage",
+                  "Video"
+                ]
+              },
+              "crop_frame_px": {
+                "type": "object",
+                "properties": {
+                  "x": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 16384
+                  },
+                  "y": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 16384
+                  },
+                  "width": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 16384
+                  },
+                  "height": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 16384
+                  }
+                },
+                "required": [
+                  "x",
+                  "y",
+                  "width",
+                  "height"
+                ],
+                "additionalProperties": false
+              },
+              "scores": {
+                "type": "object",
+                "properties": {
+                  "porn": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 1
+                  },
+                  "hentai": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 1
+                  },
+                  "sexy": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 1
+                  },
+                  "explicit_score": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 1
+                  }
+                },
+                "required": [
+                  "porn",
+                  "hentai",
+                  "sexy",
+                  "explicit_score"
+                ],
+                "additionalProperties": false
+              },
+              "evidence": {
+                "type": "object",
+                "properties": {
+                  "route": {
+                    "enum": [
+                      "explicit",
+                      "hentai_dominant"
+                    ]
+                  },
+                  "observations": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "pts_us": {
+                          "type": "string",
+                          "pattern": "^(0|[1-9][0-9]{0,18})$",
+                          "maxLength": 19
+                        },
+                        "porn": {
+                          "type": "number",
+                          "minimum": 0,
+                          "maximum": 1
+                        },
+                        "hentai": {
+                          "type": "number",
+                          "minimum": 0,
+                          "maximum": 1
+                        },
+                        "sexy": {
+                          "type": "number",
+                          "minimum": 0,
+                          "maximum": 1
+                        }
+                      },
+                      "required": [
+                        "pts_us",
+                        "porn",
+                        "hentai",
+                        "sexy"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "minItems": 3,
+                    "maxItems": 32
+                  },
+                  "analysis_continuity_id": {
+                    "type": "string",
+                    "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+                  },
+                  "analysis_complete": {
+                    "enum": [
+                      true
+                    ]
+                  }
+                },
+                "required": [
+                  "route",
+                  "observations",
+                  "analysis_continuity_id",
+                  "analysis_complete"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "required": [
+              "track_id",
+              "kind",
+              "crop_frame_px",
+              "scores",
+              "evidence"
+            ],
+            "additionalProperties": false
+          },
+          "minItems": 1,
+          "maxItems": 8
+        }
+      },
+      "required": [
+        "v",
+        "type",
+        "session_id",
+        "seq",
+        "stream_id",
+        "event_id",
+        "action_revision",
+        "pts_us",
+        "expires_at_us",
+        "screen_token",
+        "content_epoch",
+        "package",
+        "window_id",
+        "policy",
+        "frame",
+        "transform",
+        "requested_stage",
+        "requested_action",
+        "reason",
+        "regions"
+      ],
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "requested_stage": {
+                "enum": [
+                  1
+                ]
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "requested_action": {
+                "enum": [
+                  "cover_region"
+                ]
+              },
+              "regions": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "track_id": {
+                      "type": "string",
+                      "pattern": "^[1-9][0-9]{0,18}$",
+                      "maxLength": 19
+                    },
+                    "kind": {
+                      "enum": [
+                        "Image",
+                        "BackgroundImage",
+                        "Video"
+                      ]
+                    },
+                    "crop_frame_px": {
+                      "type": "object",
+                      "properties": {
+                        "x": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 16384
+                        },
+                        "y": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 16384
+                        },
+                        "width": {
+                          "type": "integer",
+                          "minimum": 1,
+                          "maximum": 16384
+                        },
+                        "height": {
+                          "type": "integer",
+                          "minimum": 1,
+                          "maximum": 16384
+                        }
+                      },
+                      "required": [
+                        "x",
+                        "y",
+                        "width",
+                        "height"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "scores": {
+                      "type": "object",
+                      "properties": {
+                        "porn": {
+                          "type": "number",
+                          "minimum": 0,
+                          "maximum": 1
+                        },
+                        "hentai": {
+                          "type": "number",
+                          "minimum": 0,
+                          "maximum": 1
+                        },
+                        "sexy": {
+                          "type": "number",
+                          "minimum": 0,
+                          "maximum": 1
+                        },
+                        "explicit_score": {
+                          "type": "number",
+                          "minimum": 0,
+                          "maximum": 1
+                        }
+                      },
+                      "required": [
+                        "porn",
+                        "hentai",
+                        "sexy",
+                        "explicit_score"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "evidence": {
+                      "type": "object",
+                      "properties": {
+                        "route": {
+                          "enum": [
+                            "explicit",
+                            "hentai_dominant"
+                          ]
+                        },
+                        "observations": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "pts_us": {
+                                "type": "string",
+                                "pattern": "^(0|[1-9][0-9]{0,18})$",
+                                "maxLength": 19
+                              },
+                              "porn": {
+                                "type": "number",
+                                "minimum": 0,
+                                "maximum": 1
+                              },
+                              "hentai": {
+                                "type": "number",
+                                "minimum": 0,
+                                "maximum": 1
+                              },
+                              "sexy": {
+                                "type": "number",
+                                "minimum": 0,
+                                "maximum": 1
+                              }
+                            },
+                            "required": [
+                              "pts_us",
+                              "porn",
+                              "hentai",
+                              "sexy"
+                            ],
+                            "additionalProperties": false
+                          },
+                          "minItems": 3,
+                          "maxItems": 32
+                        },
+                        "analysis_continuity_id": {
+                          "type": "string",
+                          "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+                        },
+                        "analysis_complete": {
+                          "enum": [
+                            true
+                          ]
+                        }
+                      },
+                      "required": [
+                        "route",
+                        "observations",
+                        "analysis_continuity_id",
+                        "analysis_complete"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "track_id",
+                    "kind",
+                    "crop_frame_px",
+                    "scores",
+                    "evidence"
+                  ],
+                  "additionalProperties": false
+                },
+                "minItems": 1,
+                "maxItems": 8
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "requested_stage": {
+                "enum": [
+                  2
+                ]
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "requested_action": {
+                "enum": [
+                  "calm_shield"
+                ]
+              },
+              "regions": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "track_id": {
+                      "type": "string",
+                      "pattern": "^[1-9][0-9]{0,18}$",
+                      "maxLength": 19
+                    },
+                    "kind": {
+                      "enum": [
+                        "Image",
+                        "BackgroundImage",
+                        "Video"
+                      ]
+                    },
+                    "crop_frame_px": {
+                      "type": "object",
+                      "properties": {
+                        "x": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 16384
+                        },
+                        "y": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 16384
+                        },
+                        "width": {
+                          "type": "integer",
+                          "minimum": 1,
+                          "maximum": 16384
+                        },
+                        "height": {
+                          "type": "integer",
+                          "minimum": 1,
+                          "maximum": 16384
+                        }
+                      },
+                      "required": [
+                        "x",
+                        "y",
+                        "width",
+                        "height"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "scores": {
+                      "type": "object",
+                      "properties": {
+                        "porn": {
+                          "type": "number",
+                          "minimum": 0,
+                          "maximum": 1
+                        },
+                        "hentai": {
+                          "type": "number",
+                          "minimum": 0,
+                          "maximum": 1
+                        },
+                        "sexy": {
+                          "type": "number",
+                          "minimum": 0,
+                          "maximum": 1
+                        },
+                        "explicit_score": {
+                          "type": "number",
+                          "minimum": 0,
+                          "maximum": 1
+                        }
+                      },
+                      "required": [
+                        "porn",
+                        "hentai",
+                        "sexy",
+                        "explicit_score"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "evidence": {
+                      "type": "object",
+                      "properties": {
+                        "route": {
+                          "enum": [
+                            "explicit",
+                            "hentai_dominant"
+                          ]
+                        },
+                        "observations": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "pts_us": {
+                                "type": "string",
+                                "pattern": "^(0|[1-9][0-9]{0,18})$",
+                                "maxLength": 19
+                              },
+                              "porn": {
+                                "type": "number",
+                                "minimum": 0,
+                                "maximum": 1
+                              },
+                              "hentai": {
+                                "type": "number",
+                                "minimum": 0,
+                                "maximum": 1
+                              },
+                              "sexy": {
+                                "type": "number",
+                                "minimum": 0,
+                                "maximum": 1
+                              }
+                            },
+                            "required": [
+                              "pts_us",
+                              "porn",
+                              "hentai",
+                              "sexy"
+                            ],
+                            "additionalProperties": false
+                          },
+                          "minItems": 3,
+                          "maxItems": 32
+                        },
+                        "analysis_continuity_id": {
+                          "type": "string",
+                          "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+                        },
+                        "analysis_complete": {
+                          "enum": [
+                            true
+                          ]
+                        }
+                      },
+                      "required": [
+                        "route",
+                        "observations",
+                        "analysis_continuity_id",
+                        "analysis_complete"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "track_id",
+                    "kind",
+                    "crop_frame_px",
+                    "scores",
+                    "evidence"
+                  ],
+                  "additionalProperties": false
+                },
+                "minItems": 1,
+                "maxItems": 1
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "requested_stage": {
+                "enum": [
+                  3
+                ]
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "requested_action": {
+                "enum": [
+                  "home"
+                ]
+              },
+              "regions": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "track_id": {
+                      "type": "string",
+                      "pattern": "^[1-9][0-9]{0,18}$",
+                      "maxLength": 19
+                    },
+                    "kind": {
+                      "enum": [
+                        "Image",
+                        "BackgroundImage",
+                        "Video"
+                      ]
+                    },
+                    "crop_frame_px": {
+                      "type": "object",
+                      "properties": {
+                        "x": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 16384
+                        },
+                        "y": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 16384
+                        },
+                        "width": {
+                          "type": "integer",
+                          "minimum": 1,
+                          "maximum": 16384
+                        },
+                        "height": {
+                          "type": "integer",
+                          "minimum": 1,
+                          "maximum": 16384
+                        }
+                      },
+                      "required": [
+                        "x",
+                        "y",
+                        "width",
+                        "height"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "scores": {
+                      "type": "object",
+                      "properties": {
+                        "porn": {
+                          "type": "number",
+                          "minimum": 0,
+                          "maximum": 1
+                        },
+                        "hentai": {
+                          "type": "number",
+                          "minimum": 0,
+                          "maximum": 1
+                        },
+                        "sexy": {
+                          "type": "number",
+                          "minimum": 0,
+                          "maximum": 1
+                        },
+                        "explicit_score": {
+                          "type": "number",
+                          "minimum": 0,
+                          "maximum": 1
+                        }
+                      },
+                      "required": [
+                        "porn",
+                        "hentai",
+                        "sexy",
+                        "explicit_score"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "evidence": {
+                      "type": "object",
+                      "properties": {
+                        "route": {
+                          "enum": [
+                            "explicit",
+                            "hentai_dominant"
+                          ]
+                        },
+                        "observations": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "pts_us": {
+                                "type": "string",
+                                "pattern": "^(0|[1-9][0-9]{0,18})$",
+                                "maxLength": 19
+                              },
+                              "porn": {
+                                "type": "number",
+                                "minimum": 0,
+                                "maximum": 1
+                              },
+                              "hentai": {
+                                "type": "number",
+                                "minimum": 0,
+                                "maximum": 1
+                              },
+                              "sexy": {
+                                "type": "number",
+                                "minimum": 0,
+                                "maximum": 1
+                              }
+                            },
+                            "required": [
+                              "pts_us",
+                              "porn",
+                              "hentai",
+                              "sexy"
+                            ],
+                            "additionalProperties": false
+                          },
+                          "minItems": 3,
+                          "maxItems": 32
+                        },
+                        "analysis_continuity_id": {
+                          "type": "string",
+                          "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+                        },
+                        "analysis_complete": {
+                          "enum": [
+                            true
+                          ]
+                        }
+                      },
+                      "required": [
+                        "route",
+                        "observations",
+                        "analysis_continuity_id",
+                        "analysis_complete"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "track_id",
+                    "kind",
+                    "crop_frame_px",
+                    "scores",
+                    "evidence"
+                  ],
+                  "additionalProperties": false
+                },
+                "minItems": 1,
+                "maxItems": 1
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "reason": {
+                "enum": [
+                  "repetition"
+                ]
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "requested_stage": {
+                "enum": [
+                  2
+                ]
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "type": "object",
+      "properties": {
+        "v": {
+          "enum": [
+            2
+          ]
+        },
+        "type": {
+          "enum": [
+            "ack"
+          ]
+        },
+        "session_id": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+        },
+        "seq": {
+          "type": "string",
+          "pattern": "^[1-9][0-9]{0,18}$",
+          "maxLength": 19
+        },
+        "stream_id": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+        },
+        "request_seq": {
+          "type": "string",
+          "pattern": "^[1-9][0-9]{0,18}$",
+          "maxLength": 19
+        },
+        "event_id": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+        },
+        "action_revision": {
+          "type": "string",
+          "pattern": "^[1-9][0-9]{0,18}$",
+          "maxLength": 19
+        },
+        "status": {
+          "enum": [
+            "executed",
+            "duplicate",
+            "rejected",
+            "failed",
+            "pending"
+          ]
+        },
+        "requested_stage": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 3
+        },
+        "executed_stage": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 3
+        },
+        "executed_action": {
+          "enum": [
+            "none",
+            "cover_region",
+            "calm_shield",
+            "home"
+          ]
+        },
+        "executed_at_us": {
+          "anyOf": [
+            {
+              "type": "null"
+            },
+            {
+              "type": "string",
+              "pattern": "^(0|[1-9][0-9]{0,18})$",
+              "maxLength": 19
+            }
+          ]
+        },
+        "screen_token": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+        },
+        "display_rects": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "x": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 16384
+              },
+              "y": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 16384
+              },
+              "width": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 16384
+              },
+              "height": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 16384
+              }
+            },
+            "required": [
+              "x",
+              "y",
+              "width",
+              "height"
+            ],
+            "additionalProperties": false
+          },
+          "minItems": 0,
+          "maxItems": 8
+        },
+        "error": {
+          "anyOf": [
+            {
+              "type": "null"
+            },
+            {
+              "enum": [
+                "unsupported_version",
+                "malformed_json",
+                "bounds",
+                "invalid_age",
+                "policy_mismatch",
+                "session_mismatch",
+                "stream_mismatch",
+                "stale",
+                "future_pts",
+                "clock_unverified",
+                "wrong_screen",
+                "invalid_transform",
+                "invalid_scores",
+                "invalid_evidence",
+                "hentai_stage3_forbidden",
+                "capability_missing",
+                "permission_missing",
+                "locked",
+                "action_failed",
+                "home_unverified",
+                "event_conflict",
+                "rate_limited",
+                "busy",
+                "storage_failed"
+              ]
+            }
+          ]
+        }
+      },
+      "required": [
+        "v",
+        "type",
+        "session_id",
+        "seq",
+        "stream_id",
+        "request_seq",
+        "event_id",
+        "action_revision",
+        "status",
+        "requested_stage",
+        "executed_stage",
+        "executed_action",
+        "executed_at_us",
+        "screen_token",
+        "display_rects",
+        "error"
+      ],
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "properties": {
+        "v": {
+          "enum": [
+            2
+          ]
+        },
+        "type": {
+          "enum": [
+            "released"
+          ]
+        },
+        "session_id": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+        },
+        "seq": {
+          "type": "string",
+          "pattern": "^[1-9][0-9]{0,18}$",
+          "maxLength": 19
+        },
+        "stream_id": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+        },
+        "event_id": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+        },
+        "action_revision": {
+          "type": "string",
+          "pattern": "^[1-9][0-9]{0,18}$",
+          "maxLength": 19
+        },
+        "reason": {
+          "enum": [
+            "verified_navigation",
+            "verified_new_content",
+            "guardian_grant"
+          ]
+        },
+        "released_at_us": {
+          "type": "string",
+          "pattern": "^(0|[1-9][0-9]{0,18})$",
+          "maxLength": 19
+        },
+        "previous_screen_token": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+        },
+        "new_screen_token": {
+          "anyOf": [
+            {
+              "type": "null"
+            },
+            {
+              "type": "string",
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+            }
+          ]
+        }
+      },
+      "required": [
+        "v",
+        "type",
+        "session_id",
+        "seq",
+        "stream_id",
+        "event_id",
+        "action_revision",
+        "reason",
+        "released_at_us",
+        "previous_screen_token",
+        "new_screen_token"
+      ],
+      "additionalProperties": false
+    }
+  ]
+}

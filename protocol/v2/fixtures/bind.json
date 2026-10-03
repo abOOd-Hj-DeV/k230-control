@@ -1,0 +1,16 @@
+{
+  "v": 2,
+  "session_id": "10000000-0000-4000-8000-000000000001",
+  "stream_id": "10000000-0000-4000-8000-000000000004",
+  "type": "bind",
+  "seq": "1",
+  "pts_clock": "android_system_nano_time_us",
+  "capture_pts_us": null,
+  "capture": {
+    "source": "scrcpy-4.0-display",
+    "display_id": 0,
+    "mirror": false,
+    "custom_crop": false,
+    "custom_rotation": false
+  }
+}

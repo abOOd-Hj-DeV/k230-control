@@ -51,6 +51,7 @@ std::array<float, 3> rgb(const VideoFrame& frame, std::uint32_t x, std::uint32_t
 struct Candidate {
   double left, top, right, bottom;
   float confidence;
+  std::size_t label;
 };
 
 double overlap(const Candidate& a, const Candidate& b) {
@@ -119,14 +120,14 @@ UiDetections ui_regions(const VideoFrame& frame, const std::vector<float>& predi
         std::clamp((x - w / 2 - box.left) / box.scale, 0.0, static_cast<double>(frame.width)),
         std::clamp((y - h / 2 - box.top) / box.scale, 0.0, static_cast<double>(frame.height)),
         std::clamp((x + w / 2 - box.left) / box.scale, 0.0, static_cast<double>(frame.width)),
-        std::clamp((y + h / 2 - box.top) / box.scale, 0.0, static_cast<double>(frame.height)), confidence};
+        std::clamp((y + h / 2 - box.top) / box.scale, 0.0, static_cast<double>(frame.height)), confidence, label};
     if (candidate.right > candidate.left && candidate.bottom > candidate.top) candidates.push_back(candidate);
   }
   std::stable_sort(candidates.begin(), candidates.end(), [](const auto& a, const auto& b) {
     return a.confidence > b.confidence;
   });
-  if (candidates.size() > 300) candidates.resize(300);
   UiDetections result;
+  if (candidates.size() > 300) { candidates.resize(300); result.complete = false; }
   std::vector<Candidate> kept, ignored;
   for (const auto& candidate : candidates) {
     const double width = candidate.right - candidate.left, height = candidate.bottom - candidate.top;
@@ -145,7 +146,10 @@ UiDetections ui_regions(const VideoFrame& frame, const std::vector<float>& predi
     const auto y = static_cast<std::uint32_t>(std::floor(candidate.top));
     const auto w = static_cast<std::uint32_t>(std::ceil(candidate.right)) - x;
     const auto h = static_cast<std::uint32_t>(std::ceil(candidate.bottom)) - y;
-    if (result.regions.size() < config.max_regions) result.regions.push_back({x, y, w, h});
+    if (result.regions.size() < config.max_regions) {
+      result.regions.push_back({x, y, w, h});
+      result.kinds.push_back(candidate.label == 0 ? "BackgroundImage" : "Image");
+    } else result.complete = false;
   }
   return result;
 }

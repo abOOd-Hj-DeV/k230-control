@@ -1,0 +1,25 @@
+{
+  "v": 2,
+  "session_id": "10000000-0000-4000-8000-000000000001",
+  "stream_id": "10000000-0000-4000-8000-000000000004",
+  "type": "ack",
+  "seq": "3",
+  "request_seq": "3",
+  "event_id": "10000000-0000-4000-8000-000000000005",
+  "action_revision": "1",
+  "status": "executed",
+  "requested_stage": 1,
+  "executed_stage": 1,
+  "executed_action": "cover_region",
+  "executed_at_us": "10450000",
+  "screen_token": "10000000-0000-4000-8000-000000000002",
+  "display_rects": [
+    {
+      "x": 60,
+      "y": 300,
+      "width": 480,
+      "height": 900
+    }
+  ],
+  "error": null
+}
