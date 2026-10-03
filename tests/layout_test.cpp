@@ -3,6 +3,7 @@
 #include "test_helpers.hpp"
 
 #include <gtest/gtest.h>
+#include <algorithm>
 #include <fstream>
 #include <iterator>
 #include <condition_variable>
