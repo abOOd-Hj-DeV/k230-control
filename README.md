@@ -71,6 +71,52 @@ Cross builds only need `-DK230_TARGET=little|big` plus a toolchain file
 
 ## تجربة NSFWJS على PC / WSL
 
+### كشف مناطق الوسائط بصرياً باستخدام Android UI YOLOv8 Nano
+
+للمسار الجديد، أضف `--ui-model models/android-ui-yolov8n.onnx` إلى أمر
+التشغيل مع `--nsfwjs-model`. النموذج يحدد `Image` و`BackgroundImage` من
+**الإطار نفسه**، ثم يحلل عاملان NSFWJS القصوص المؤهلة. هذا المسار لا يحتاج
+Mentor أو تشغيل Accessibility، ولا ينتظر اكتمال نافذة الصوت. التحذير فقط
+مفعّل كما في تجربة NSFWJS؛ يظل تسجيل الصوت والفيديو وتوقيت الهاتف كما هو.
+
+بعد تجهيز ONNX Runtime والبناء بالأوامر أدناه، شغّل داخل WSL:
+
+```bash
+mkdir -p output
+./build/apps/k230-monitor --adb /usr/bin/adb --max-fps 10 \
+  --nsfwjs-model models/nsfwjs-mobilenet-v2.onnx \
+  --ui-model models/android-ui-yolov8n.onnx \
+  --ui-min-side 64 --ui-min-area 0.01 --ui-confidence 0.25 \
+  --record output/ui-phone.k230rec --dump-dir output/ui-phone \
+  --duration 30 --verbose 2>&1 | tee -i output/ui-phone.log
+```
+
+يُستبعد القص قبل تشغيل NSFWJS إذا كان **عرضه أو ارتفاعه أقل من 64 بكسل**،
+أو مساحته أقل من **1% من مساحة الإطار المفكوك**. يمكن تعديل الحدين عبر
+`--ui-min-side` و`--ui-min-area`؛ المثال يستخدم القيم الافتراضية.
+القياسات بعد إزالة letterbox وقص المستطيل إلى حدود الإطار، وليست على
+صورة إدخال YOLO. يعالج المسار حتى ثماني مناطق في الإطار، مع NMS على أعلى
+300 مرشح. يمكن ضبط العدد عبر `--ui-max-regions` وحد التداخل عبر `--ui-iou`.
+عند انعدام المناطق المؤهلة، لا يُشغّل NSFWJS ولا تُستخدم الشاشة
+الكاملة أو الشرائح البديلة، وتكون النتيجة `Unknown` بدلاً من `Safe`.
+السجل يعرض `ignored_small` و`skipped` وإحداثيات القص الفائز `crop=x,y,WxH`.
+
+لإعادة تحليل تسجيل دون خدمة التخطيط:
+
+```bash
+./build/inspector/k230-inspector --replay output/ui-phone.k230rec --realtime \
+  --nsfwjs-model models/nsfwjs-mobilenet-v2.onnx \
+  --ui-model models/android-ui-yolov8n.onnx --verbose
+```
+
+الأوزان المحوّلة موجودة في المستودع ولا يحتاج التشغيل إلى Python أو Ultralytics.
+راجع [مصدر الأوزان والتحويل والترخيص](models/ANDROID_UI_MODEL.md).
+الاختبارات على PC لا تثبت دقة الكشف في كل تطبيق، أو سرعة وتوافق K230/KPU.
+لا تجمع `--ui-model` مع `--layout` أو `--layout-replay`. الخيار القديم
+`--nsfwjs-regions` لا يضيف شرائح في مسار UI.
+
+### إعداد ONNX Runtime والتجربة الأصلية
+
 الأوزان المحوّلة موجودة في المستودع؛ لا تحتاج إلى TensorFlow أو JavaScript
 لتشغيل المصنّف. نفّذ من جذر مشروع C++ داخل Linux أو WSL (Python 3.10–3.12):
 

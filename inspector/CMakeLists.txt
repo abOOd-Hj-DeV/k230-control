@@ -10,6 +10,7 @@ set(INSPECTOR_SOURCES
   src/kpu_analyzer.cpp
   src/nsfwjs_analyzer.cpp
   src/fast_vision.cpp
+  src/ui_detector.cpp
 )
 
 add_library(k230_inspector STATIC ${INSPECTOR_SOURCES})

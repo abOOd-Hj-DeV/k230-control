@@ -36,6 +36,7 @@ struct Scores {
   double preparation_ms = 0.0;
   double inference_ms = 0.0;
   double transform_ms = 0.0;
+  std::optional<ImageRegion> crop;
 };
 
 std::string describe_scores(const Scores& scores);

@@ -60,6 +60,11 @@ void usage() {
       "  --nsfwjs-regions N            rotate through up to N screen regions (default: 9)\n"
       "  --layout                      fast vision: Mentor layout + two NSFWJS workers, no audio wait\n"
       "  --layout-record FILE          record the independently framed layout stream\n"
+      "  --ui-model PATH               Android UI YOLOv8 Nano ONNX + two NSFWJS workers, without Mentor\n"
+      "  --ui-confidence X             detector confidence threshold (default: 0.25)\n"
+      "  --ui-iou X --ui-max-regions N  overlap threshold (0.7) and crop limit (8)\n"
+      "  --ui-min-side N               minimum crop width AND height in decoded pixels (default: 64)\n"
+      "  --ui-min-area X               minimum crop fraction of frame area (default: 0.01)\n"
       "  --warn X --block X --confirm N --cooldown-ms N   policy tuning\n"
       "  --duration SEC --verbose");
 }
@@ -95,6 +100,22 @@ int main(int argc, char** argv) {
 
   std::unique_ptr<inspector::Analyzer> analyzer;
   inspector::NsfwjsConfig nsfw;
+  std::unique_ptr<inspector::RegionDetector> detector;
+  if (cli.has("ui-model")) {
+    if (!cli.has("nsfwjs-model") || cli.has("layout")) {
+      K230_LOG_ERROR("monitor") << "--ui-model requires --nsfwjs-model and cannot be combined with --layout";
+      return 1;
+    }
+    inspector::UiDetectorConfig ui;
+    ui.model_path = cli.get("ui-model");
+    ui.min_side = static_cast<std::uint32_t>(cli.get_int("ui-min-side", 64));
+    ui.min_area = static_cast<float>(cli.get_double("ui-min-area", 0.01));
+    ui.confidence = static_cast<float>(cli.get_double("ui-confidence", 0.25));
+    ui.iou = static_cast<float>(cli.get_double("ui-iou", 0.7));
+    ui.max_regions = static_cast<std::uint32_t>(cli.get_int("ui-max-regions", 8));
+    detector = inspector::make_ui_detector(ui);
+    if (!detector || !detector->open()) return 1;
+  }
   if (cli.has("layout") && !cli.has("nsfwjs-model")) {
     K230_LOG_ERROR("monitor") << "--layout requires --nsfwjs-model";
     return 1;
@@ -103,9 +124,9 @@ int main(int argc, char** argv) {
     nsfw.model_path = cli.get("nsfwjs-model");
     nsfw.threads = static_cast<int>(cli.get_int("onnx-threads", 1));
     nsfw.max_regions = static_cast<std::uint32_t>(cli.get_int("nsfwjs-regions", 9));
-    if (cli.has("layout")) {
+    if (cli.has("layout") || cli.has("ui-model")) {
       if (nsfw.threads != 1) {
-        K230_LOG_ERROR("monitor") << "--layout requires --onnx-threads 1";
+        K230_LOG_ERROR("monitor") << "fast vision requires --onnx-threads 1";
         return 1;
       }
       analyzer = std::make_unique<inspector::HeuristicAnalyzer>();
@@ -144,14 +165,21 @@ int main(int argc, char** argv) {
   inspector::InspectorPipeline pipeline(pcfg, packets, verdicts, inspector::make_default_video_decoder(),
                                         std::move(analyzer));
   std::unique_ptr<bridge::LayoutReceiver> layouts;
+  std::unique_ptr<inspector::FastVision> vision;
+  if (cli.has("ui-model")) {
+    vision = std::make_unique<inspector::FastVision>(
+        [nsfw] { return inspector::make_nsfwjs_region_analyzer(nsfw); }, std::move(detector), pcfg.policy, verdicts);
+  }
   if (cli.has("layout")) {
     auto cache = std::make_shared<LayoutCache>();
     bridge::LayoutReceiverConfig lcfg;
     lcfg.recording = cli.get("layout-record", "");
     layouts = std::make_unique<bridge::LayoutReceiver>(lcfg, adb, session.device_serial(), cache);
     layouts->start();
-    auto vision = std::make_unique<inspector::FastVision>(
+    vision = std::make_unique<inspector::FastVision>(
         [nsfw] { return inspector::make_nsfwjs_region_analyzer(nsfw); }, cache, pcfg.policy, verdicts);
+  }
+  if (vision) {
     vision->set_observer([](const inspector::VideoFrame& f, const inspector::Scores& sc, const Verdict& v) {
       K230_LOG_INFO("vision") << "pts=" << f.pts_us << " " << inspector::describe_scores(sc)
                               << " -> " << to_string(v.action) << "/" << to_string(v.category);
@@ -198,6 +226,8 @@ int main(int argc, char** argv) {
       K230_LOG_INFO("monitor") << "in: video=" << v.packets << " audio=" << a.packets << " | decoded=" << st.frames_decoded
                                << " analyzed=" << (vision_stats ? vision_stats->analyzed.load() : st.samples_analyzed)
                                << " vision_drops=" << (vision_stats ? vision_stats->dropped.load() : 0)
+                               << " skipped=" << (vision_stats ? vision_stats->skipped.load() : 0)
+                               << " ignored_small=" << (vision_stats ? vision_stats->ignored_small.load() : 0)
                                << " incomplete=" << ss.emitted_incomplete
                                << " av_lead=" << ss.last_av_lead_us / 1000 << "ms"
                                << " | queue=" << packets->size() << " drops=" << packets->drops()

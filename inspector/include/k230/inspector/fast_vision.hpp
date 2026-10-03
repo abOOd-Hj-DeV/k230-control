@@ -13,6 +13,7 @@
 
 #include "k230/inspector/nsfwjs_analyzer.hpp"
 #include "k230/inspector/policy.hpp"
+#include "k230/inspector/ui_detector.hpp"
 #include "k230/ipc/channel.hpp"
 #include "k230/layout.hpp"
 
@@ -36,8 +37,11 @@ class FastVision {
   using Observer = std::function<void(const VideoFrame&, const Scores&, const Verdict&)>;
   struct Stats {
     std::atomic<std::uint64_t> submitted{0}, dropped{0}, analyzed{0}, layout_misses{0}, failures{0}, warnings{0};
+    std::atomic<std::uint64_t> skipped{0}, ignored_small{0};
   };
   FastVision(Factory factory, std::shared_ptr<LayoutCache> layouts, PolicyConfig policy,
+             std::shared_ptr<ipc::VerdictSink> verdicts);
+  FastVision(Factory factory, std::unique_ptr<RegionDetector> detector, PolicyConfig policy,
              std::shared_ptr<ipc::VerdictSink> verdicts);
   ~FastVision();
   bool start();
@@ -60,6 +64,7 @@ class FastVision {
   void worker(std::size_t index);
   Factory factory_;
   std::shared_ptr<LayoutCache> layouts_;
+  std::unique_ptr<RegionDetector> detector_;
   Policy policy_;
   std::shared_ptr<ipc::VerdictSink> verdicts_;
   Observer observer_;

@@ -70,9 +70,16 @@ VisionRegions vision_regions(const VideoFrame& frame, const std::optional<Layout
 FastVision::FastVision(Factory factory, std::shared_ptr<LayoutCache> layouts, PolicyConfig policy,
                        std::shared_ptr<ipc::VerdictSink> verdicts)
     : factory_(std::move(factory)), layouts_(std::move(layouts)), policy_(policy), verdicts_(std::move(verdicts)) {}
+FastVision::FastVision(Factory factory, std::unique_ptr<RegionDetector> detector, PolicyConfig policy,
+                       std::shared_ptr<ipc::VerdictSink> verdicts)
+    : FastVision(std::move(factory), std::shared_ptr<LayoutCache>{}, policy, std::move(verdicts)) {
+  detector_ = std::move(detector);
+}
 FastVision::~FastVision() { finish(); }
 
 bool FastVision::start() {
+  if (!layouts_ && !detector_) return false;
+  if (detector_ && !detector_->open()) return false;
   for (int i = 0; i < 2; ++i) {
     auto analyzer = factory_();
     if (!analyzer || !analyzer->open()) return false;
@@ -149,11 +156,28 @@ void FastVision::coordinate() {
       work->arrival = pending_arrival_;
     }
     const auto transform_start = std::chrono::steady_clock::now();
-    auto layout = layouts_->match(work->frame->pts_us);
-    work->selection = vision_regions(*work->frame, layout);
+    if (detector_) {
+      work->selection.identity = static_cast<std::uint64_t>(work->frame->width) << 32 | work->frame->height;
+      try {
+        auto detected = detector_->detect(*work->frame);
+        stats_.ignored_small += detected.ignored_small;
+        work->selection.regions = std::move(detected.regions);
+        for (std::size_t i = 0; i < work->selection.regions.size(); ++i) {
+          work->selection.ids.push_back(static_cast<std::uint32_t>(i + 1));
+        }
+        K230_LOG_DEBUG("ui") << "pts=" << work->frame->pts_us << " regions=" << work->selection.regions.size()
+                             << " ignored_small=" << detected.ignored_small;
+      } catch (const std::exception& e) {
+        ++stats_.failures;
+        work->failed = true;
+        K230_LOG_ERROR("ui") << "pts=" << work->frame->pts_us << " detection failed: " << e.what();
+      }
+    } else {
+      work->selection = vision_regions(*work->frame, layouts_->match(work->frame->pts_us));
+      if (work->selection.sequence == 0) ++stats_.layout_misses;
+    }
     const auto transform_ms = std::chrono::duration<double, std::milli>(
         std::chrono::steady_clock::now() - transform_start).count();
-    if (work->selection.sequence == 0) ++stats_.layout_misses;
     work->scores.resize(work->selection.regions.size());
     {
       std::unique_lock<std::mutex> lock(mutex_);
@@ -172,14 +196,18 @@ void FastVision::coordinate() {
     aggregate.analysis_layout = work->selection.identity;
     aggregate.layout_sequence = work->selection.sequence;
     aggregate.layout_session = work->selection.session;
-    aggregate.source_region = work->selection.ids[aggregate.analysis_region];
+    if (!work->selection.regions.empty()) {
+      aggregate.source_region = work->selection.ids[aggregate.analysis_region];
+      aggregate.crop = work->selection.regions[aggregate.analysis_region];
+    }
     aggregate.transform_ms = transform_ms;
     aggregate.analysis_complete = work->selection.complete && !work->failed;
     aggregate.frame_ms = std::chrono::duration<double, std::milli>(
         std::chrono::steady_clock::now() - work->arrival).count();
     aggregate.analysis_region = 0;
     auto verdict = policy_.evaluate(work->frame->pts_us, aggregate);
-    ++stats_.analyzed;
+    if (work->scores.empty()) ++stats_.skipped;
+    else ++stats_.analyzed;
     if (verdict.action >= Action::Warn) ++stats_.warnings;
     if (observer_) observer_(*work->frame, aggregate, verdict);
     verdicts_->push(std::move(verdict));

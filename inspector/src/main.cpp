@@ -113,6 +113,11 @@ void usage() {
       "  --replay FILE                 .k230rec produced by `k230-bridge --record`\n"
       "  --realtime                    pace the replay by PTS instead of as fast as possible\n"
       "  --layout-replay FILE          fast vision using recorded Mentor snapshots and --nsfwjs-model\n"
+      "  --ui-model PATH               Android UI YOLOv8 Nano ONNX crops, without Mentor\n"
+      "  --ui-confidence X             detector confidence threshold (default: 0.25)\n"
+      "  --ui-iou X --ui-max-regions N  overlap threshold (0.7) and crop limit (8)\n"
+      "  --ui-min-side N               minimum crop width AND height in decoded pixels (default: 64)\n"
+      "  --ui-min-area X               minimum crop fraction of frame area (default: 0.01)\n"
       "  --verdicts ipcmsg|stdout      where verdicts go (default: stdout on PC)\n"
       "  --kmodel PATH                 use the KPU analyzer with this model (K230 only)\n"
       "  --nsfwjs-model PATH           use NSFWJS MobileNetV2 ONNX (PC, warning-only evaluation)\n"
@@ -155,6 +160,22 @@ int main(int argc, char** argv) {
   }
   std::unique_ptr<Analyzer> analyzer;
   NsfwjsConfig nsfw;
+  std::unique_ptr<RegionDetector> detector;
+  if (cli.has("ui-model")) {
+    if (!cli.has("nsfwjs-model") || cli.has("layout-replay")) {
+      K230_LOG_ERROR("inspector") << "--ui-model requires --nsfwjs-model and cannot be combined with --layout-replay";
+      return 1;
+    }
+    UiDetectorConfig ui;
+    ui.model_path = cli.get("ui-model");
+    ui.min_side = static_cast<std::uint32_t>(cli.get_int("ui-min-side", 64));
+    ui.min_area = static_cast<float>(cli.get_double("ui-min-area", 0.01));
+    ui.confidence = static_cast<float>(cli.get_double("ui-confidence", 0.25));
+    ui.iou = static_cast<float>(cli.get_double("ui-iou", 0.7));
+    ui.max_regions = static_cast<std::uint32_t>(cli.get_int("ui-max-regions", 8));
+    detector = make_ui_detector(ui);
+    if (!detector || !detector->open()) return 1;
+  }
   auto layouts = std::make_shared<LayoutCache>();
   if (cli.has("layout-replay") && (!cli.has("nsfwjs-model") || !cli.has("replay"))) {
     K230_LOG_ERROR("inspector") << "--layout-replay requires --replay and --nsfwjs-model";
@@ -164,8 +185,13 @@ int main(int argc, char** argv) {
     nsfw.model_path = cli.get("nsfwjs-model");
     nsfw.threads = static_cast<int>(cli.get_int("onnx-threads", 1));
     nsfw.max_regions = static_cast<std::uint32_t>(cli.get_int("nsfwjs-regions", 9));
-    if (cli.has("layout-replay")) analyzer = std::make_unique<HeuristicAnalyzer>();
-    else {
+    if (cli.has("layout-replay") || cli.has("ui-model")) {
+      if (nsfw.threads != 1) {
+        K230_LOG_ERROR("inspector") << "fast vision requires --onnx-threads 1";
+        return 1;
+      }
+      analyzer = std::make_unique<HeuristicAnalyzer>();
+    } else {
       analyzer = make_nsfwjs_analyzer(nsfw);
       if (!analyzer || !analyzer->open()) return 1;
     }
@@ -207,9 +233,16 @@ int main(int argc, char** argv) {
   }
 
   InspectorPipeline pipeline(cfg, source, verdicts, make_default_video_decoder(), std::move(analyzer));
+  std::unique_ptr<FastVision> vision;
+  if (cli.has("ui-model")) {
+    vision = std::make_unique<FastVision>(
+        [nsfw] { return make_nsfwjs_region_analyzer(nsfw); }, std::move(detector), cfg.policy, verdicts);
+  }
   if (cli.has("layout-replay")) {
-    auto vision = std::make_unique<FastVision>(
+    vision = std::make_unique<FastVision>(
         [nsfw] { return make_nsfwjs_region_analyzer(nsfw); }, layouts, cfg.policy, verdicts);
+  }
+  if (vision) {
     vision->set_observer([](const auto& frame, const auto& scores, const auto&) {
       K230_LOG_INFO("vision") << "pts=" << frame.pts_us << " " << describe_scores(scores);
     });
