@@ -97,7 +97,8 @@ void InspectorPipeline::run_loop() {
     const auto& st = vision_->stats();
     stats_.samples_analyzed = st.analyzed;
     stats_.verdicts_escalated = st.warnings;
-    K230_LOG_INFO("vision") << "analyzed=" << st.analyzed << " dropped=" << st.dropped
+    K230_LOG_INFO("vision") << "analyzed=" << st.analyzed << " skipped=" << st.skipped
+                            << " ignored_small=" << st.ignored_small << " dropped=" << st.dropped
                             << " layout_misses=" << st.layout_misses << " failures=" << st.failures;
   }
   if (capture_ && !capture_->finish()) {

@@ -19,6 +19,10 @@ std::string describe_scores(const Scores& scores) {
         << " frame_ms=" << scores.frame_ms << " transform_ms=" << scores.transform_ms
         << " prepare_ms=" << scores.preparation_ms << " inference_ms=" << scores.inference_ms;
   }
+  if (scores.crop) {
+    const auto& crop = *scores.crop;
+    out << " crop=" << crop.x << "," << crop.y << "," << crop.width << "x" << crop.height;
+  }
   return out.str();
 }
 
