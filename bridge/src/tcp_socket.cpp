@@ -16,13 +16,19 @@ namespace k230::bridge {
 
 TcpSocket::~TcpSocket() { close(); }
 
-TcpSocket::TcpSocket(TcpSocket&& other) noexcept : fd_(other.fd_) { other.fd_ = -1; }
+TcpSocket::TcpSocket(TcpSocket&& other) noexcept
+    : fd_(other.fd_), last_receive_timed_out_(other.last_receive_timed_out_) {
+  other.fd_ = -1;
+  other.last_receive_timed_out_ = false;
+}
 
 TcpSocket& TcpSocket::operator=(TcpSocket&& other) noexcept {
   if (this != &other) {
     close();
     fd_ = other.fd_;
+    last_receive_timed_out_ = other.last_receive_timed_out_;
     other.fd_ = -1;
+    other.last_receive_timed_out_ = false;
   }
   return *this;
 }
@@ -65,6 +71,7 @@ bool TcpSocket::connect(const std::string& host, std::uint16_t port, int timeout
   int one = 1;
   ::setsockopt(fd, IPPROTO_TCP, TCP_NODELAY, &one, sizeof(one));
   fd_ = fd;
+  last_receive_timed_out_ = false;
   return true;
 }
 
@@ -73,6 +80,7 @@ void TcpSocket::close() {
     ::close(fd_);
     fd_ = -1;
   }
+  last_receive_timed_out_ = false;
 }
 
 bool TcpSocket::set_send_timeout(int timeout_ms) {
@@ -86,11 +94,16 @@ void TcpSocket::shutdown() {
 }
 
 long TcpSocket::recv(std::uint8_t* buf, std::size_t len, int timeout_ms) {
+  last_receive_timed_out_ = false;
   if (fd_ < 0) return -1;
   if (timeout_ms >= 0) {
     pollfd pfd{fd_, POLLIN, 0};
     int r = ::poll(&pfd, 1, timeout_ms);
-    if (r <= 0) return -1;
+    if (r == 0) {
+      last_receive_timed_out_ = true;
+      return -1;
+    }
+    if (r < 0) return -1;
   }
   for (;;) {
     ssize_t n = ::recv(fd_, buf, len, 0);

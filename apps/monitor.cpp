@@ -19,6 +19,7 @@
 #include "k230/bridge/adb_controller.hpp"
 #include "k230/bridge/scrcpy_session.hpp"
 #include "k230/bridge/verdict_dispatcher.hpp"
+#include "k230/bridge/layout_receiver.hpp"
 #include "k230/cli.hpp"
 #include "k230/inspector/pipeline.hpp"
 #include "k230/inspector/nsfwjs_analyzer.hpp"
@@ -57,6 +58,8 @@ void usage() {
       "  --nsfwjs-model PATH           use NSFWJS MobileNetV2 ONNX (PC, warning-only evaluation)\n"
       "  --onnx-threads N              CPU inference threads (default: 1)\n"
       "  --nsfwjs-regions N            rotate through up to N screen regions (default: 9)\n"
+      "  --layout                      fast vision: Mentor layout + two NSFWJS workers, no audio wait\n"
+      "  --layout-record FILE          record the independently framed layout stream\n"
       "  --warn X --block X --confirm N --cooldown-ms N   policy tuning\n"
       "  --duration SEC --verbose");
 }
@@ -91,13 +94,25 @@ int main(int argc, char** argv) {
   pcfg.dump_dir = cli.get("dump-dir", "");
 
   std::unique_ptr<inspector::Analyzer> analyzer;
+  inspector::NsfwjsConfig nsfw;
+  if (cli.has("layout") && !cli.has("nsfwjs-model")) {
+    K230_LOG_ERROR("monitor") << "--layout requires --nsfwjs-model";
+    return 1;
+  }
   if (cli.has("nsfwjs-model")) {
-    inspector::NsfwjsConfig nsfw;
     nsfw.model_path = cli.get("nsfwjs-model");
     nsfw.threads = static_cast<int>(cli.get_int("onnx-threads", 1));
     nsfw.max_regions = static_cast<std::uint32_t>(cli.get_int("nsfwjs-regions", 9));
-    analyzer = inspector::make_nsfwjs_analyzer(nsfw);
-    if (!analyzer || !analyzer->open()) return 1;
+    if (cli.has("layout")) {
+      if (nsfw.threads != 1) {
+        K230_LOG_ERROR("monitor") << "--layout requires --onnx-threads 1";
+        return 1;
+      }
+      analyzer = std::make_unique<inspector::HeuristicAnalyzer>();
+    } else {
+      analyzer = inspector::make_nsfwjs_analyzer(nsfw);
+      if (!analyzer || !analyzer->open()) return 1;
+    }
     pcfg.allow_analyzer_fallback = false;
     pcfg.policy.escalated_action = Action::Warn;
   } else {
@@ -128,6 +143,21 @@ int main(int argc, char** argv) {
 
   inspector::InspectorPipeline pipeline(pcfg, packets, verdicts, inspector::make_default_video_decoder(),
                                         std::move(analyzer));
+  std::unique_ptr<bridge::LayoutReceiver> layouts;
+  if (cli.has("layout")) {
+    auto cache = std::make_shared<LayoutCache>();
+    bridge::LayoutReceiverConfig lcfg;
+    lcfg.recording = cli.get("layout-record", "");
+    layouts = std::make_unique<bridge::LayoutReceiver>(lcfg, adb, session.device_serial(), cache);
+    layouts->start();
+    auto vision = std::make_unique<inspector::FastVision>(
+        [nsfw] { return inspector::make_nsfwjs_region_analyzer(nsfw); }, cache, pcfg.policy, verdicts);
+    vision->set_observer([](const inspector::VideoFrame& f, const inspector::Scores& sc, const Verdict& v) {
+      K230_LOG_INFO("vision") << "pts=" << f.pts_us << " " << inspector::describe_scores(sc)
+                              << " -> " << to_string(v.action) << "/" << to_string(v.category);
+    });
+    pipeline.set_vision(std::move(vision));
+  }
   pipeline.set_observer([](const inspector::SyncedSample& s, const inspector::Scores& sc, const Verdict& v) {
     if (v.action >= Action::Warn || log::threshold() <= log::Level::Debug) {
       K230_LOG_INFO("sample") << "pts=" << s.frame.pts_us << " audio=" << s.audio_filled_us / 1000 << "ms"
@@ -163,9 +193,12 @@ int main(int argc, char** argv) {
       const auto v = session.video_stats();
       const auto a = session.audio_stats();
       const auto& st = pipeline.stats();
+      const auto* vision_stats = pipeline.vision_stats();
       const auto& ss = pipeline.sync().stats();
       K230_LOG_INFO("monitor") << "in: video=" << v.packets << " audio=" << a.packets << " | decoded=" << st.frames_decoded
-                               << " analyzed=" << st.samples_analyzed << " incomplete=" << ss.emitted_incomplete
+                               << " analyzed=" << (vision_stats ? vision_stats->analyzed.load() : st.samples_analyzed)
+                               << " vision_drops=" << (vision_stats ? vision_stats->dropped.load() : 0)
+                               << " incomplete=" << ss.emitted_incomplete
                                << " av_lead=" << ss.last_av_lead_us / 1000 << "ms"
                                << " | queue=" << packets->size() << " drops=" << packets->drops()
                                << " gaps=" << st.video_gaps

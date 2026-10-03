@@ -13,7 +13,11 @@ std::string describe_scores(const Scores& scores) {
     out << " Drawing=" << nsfw.drawing << " Hentai=" << nsfw.hentai << " Neutral=" << nsfw.neutral
         << " Porn=" << nsfw.porn << " Sexy=" << nsfw.sexy
         << " region=" << scores.analysis_region + 1 << "/" << scores.analysis_regions
-        << " analysis_ms=" << scores.analysis_ms;
+        << " analysis_ms=" << scores.analysis_ms
+        << " layout_session=" << scores.layout_session << " layout_seq=" << scores.layout_sequence
+        << " region_id=" << scores.source_region << " complete=" << scores.analysis_complete
+        << " frame_ms=" << scores.frame_ms << " transform_ms=" << scores.transform_ms
+        << " prepare_ms=" << scores.preparation_ms << " inference_ms=" << scores.inference_ms;
   }
   return out.str();
 }

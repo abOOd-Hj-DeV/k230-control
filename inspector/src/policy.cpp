@@ -38,6 +38,14 @@ Action Policy::step(TrackGroup& group, float score, std::int64_t pts_us, std::ui
 }
 
 Verdict Policy::evaluate(std::int64_t pts_us, const Scores& scores) {
+  if (pts_us < 0 || pts_us <= last_pts_us_) {
+    Verdict ignored;
+    ignored.pts_us = pts_us;
+    ignored.category = Category::Unknown;
+    ignored.sequence = ++sequence_;
+    return ignored;
+  }
+  last_pts_us_ = pts_us;
   struct Candidate {
     Category category;
     float score;
@@ -56,7 +64,7 @@ Verdict Policy::evaluate(std::int64_t pts_us, const Scores& scores) {
   v.pts_us = pts_us;
   v.sequence = ++sequence_;
   v.action = Action::Log;
-  v.category = Category::Safe;
+  v.category = scores.analysis_complete ? Category::Safe : Category::Unknown;
   v.confidence = 1.0f;
 
   float top_score = 0.0f;

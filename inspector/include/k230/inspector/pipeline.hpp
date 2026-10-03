@@ -11,6 +11,7 @@
 #include "k230/inspector/frame_dump.hpp"
 #include "k230/inspector/policy.hpp"
 #include "k230/inspector/sync_engine.hpp"
+#include "k230/inspector/fast_vision.hpp"
 #include "k230/ipc/channel.hpp"
 
 namespace k230::inspector {
@@ -50,12 +51,14 @@ class InspectorPipeline {
                     std::unique_ptr<Analyzer> analyzer);
 
   void set_observer(SampleObserver observer) { observer_ = std::move(observer); }
+  void set_vision(std::unique_ptr<FastVision> vision) { vision_ = std::move(vision); }
 
   // Blocks until the source is closed and drained, or request_stop() is called.
   bool run();
   void request_stop() { stop_ = true; }
 
   const Stats& stats() const { return stats_; }
+  const FastVision::Stats* vision_stats() const { return vision_ ? &vision_->stats() : nullptr; }
   const SyncEngine& sync() const { return sync_; }
 
  private:
@@ -74,6 +77,7 @@ class InspectorPipeline {
   SyncEngine sync_;
   Policy policy_;
   std::unique_ptr<ContinuousCapture> capture_;
+  std::unique_ptr<FastVision> vision_;
   SampleObserver observer_;
   std::atomic<bool> stop_{false};
   bool video_open_ = false;

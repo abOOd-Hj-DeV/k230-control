@@ -52,6 +52,7 @@ class Policy {
   TrackGroup violence_;
   TrackGroup profanity_;
   std::uint32_t sequence_ = 0;
+  std::int64_t last_pts_us_ = -1;
 };
 
 }  // namespace k230::inspector

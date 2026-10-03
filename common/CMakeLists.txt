@@ -2,6 +2,7 @@ add_library(k230_common STATIC
   src/scrcpy_demuxer.cpp
   src/recording.cpp
   src/verdict.cpp
+  src/layout.cpp
   src/ipc/datafifo_channel.cpp
 )
 
