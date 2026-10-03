@@ -47,7 +47,7 @@ void AgePolicy::executed(const std::string& id, const std::string& package, int 
   events_.push_back({id, package, time});
   while (events_.size() > 1024) events_.pop_front();
 }
-AgeDecision AgePolicy::evaluate(const AnalysisBatch& batch) {
+AgeDecision AgePolicy::evaluate(const AnalysisBatch& batch, const std::string& episode_id, std::int64_t phone_now_us) {
   AgeDecision out;
   if (!profile_ || batch.pts_us < 0 || batch.pts_us <= last_pts_) return out;
   if (batch.identity != identity_ || batch.discontinuity || (last_pts_ >= 0 && batch.pts_us-last_pts_ > 500000)) {
@@ -78,8 +78,10 @@ AgeDecision AgePolicy::evaluate(const AnalysisBatch& batch) {
   for (const auto& e : edges) if (!ambiguous_current.count(e.current) && !ambiguous_previous.count(e.previous) &&
       !matched.count(e.current) && !used.count(e.previous)) { matched[e.current] = e.previous; used.insert(e.previous); }
   std::vector<Track> next;
+  const auto now = phone_now_us < 0 ? batch.pts_us : phone_now_us;
   int events = 1;
-  for (const auto& e : events_) if (e.package == batch.package && e.time <= batch.pts_us && batch.pts_us-e.time < 60000000) ++events;
+  for (const auto& e : events_) if (e.id != episode_id && e.package == batch.package &&
+      e.time <= now && now-e.time < 60000000) ++events;
   for (std::size_t i = 0; i < batch.regions.size(); ++i) {
     const auto& r = batch.regions[i];
     if (!eligible(r,batch.width,batch.height) || !r.complete || !r.scores.valid() || r.masked) { out.safe = false; continue; }

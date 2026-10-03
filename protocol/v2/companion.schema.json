@@ -301,6 +301,18 @@
             "android_system_nano_time_us"
           ]
         },
+        "capture_pts_us": {
+          "anyOf": [
+            {
+              "type": "null"
+            },
+            {
+              "type": "string",
+              "pattern": "^(0|[1-9][0-9]{0,18})$",
+              "maxLength": 19
+            }
+          ]
+        },
         "capture": {
           "type": "object",
           "properties": {
@@ -347,6 +359,7 @@
         "seq",
         "stream_id",
         "pts_clock",
+        "capture_pts_us",
         "capture"
       ],
       "additionalProperties": false
@@ -384,6 +397,7 @@
         },
         "status": {
           "enum": [
+            "pending",
             "accepted",
             "rejected"
           ]
@@ -440,7 +454,59 @@
         "error",
         "phone_time_us"
       ],
-      "additionalProperties": false
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "status": {
+                "enum": [
+                  "rejected"
+                ]
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "error": {
+                "enum": [
+                  "unsupported_version",
+                  "malformed_json",
+                  "bounds",
+                  "invalid_age",
+                  "policy_mismatch",
+                  "session_mismatch",
+                  "stream_mismatch",
+                  "stale",
+                  "future_pts",
+                  "clock_unverified",
+                  "wrong_screen",
+                  "invalid_transform",
+                  "invalid_scores",
+                  "invalid_evidence",
+                  "hentai_stage3_forbidden",
+                  "capability_missing",
+                  "permission_missing",
+                  "locked",
+                  "action_failed",
+                  "home_unverified",
+                  "event_conflict",
+                  "rate_limited",
+                  "busy",
+                  "storage_failed"
+                ]
+              }
+            }
+          },
+          "else": {
+            "properties": {
+              "error": {
+                "type": "null"
+              }
+            }
+          }
+        }
+      ]
     },
     {
       "type": "object",
@@ -684,6 +750,29 @@
                 }
               ]
             },
+            "action_revision": {
+              "anyOf": [
+                {
+                  "type": "null"
+                },
+                {
+                  "type": "string",
+                  "pattern": "^[1-9][0-9]{0,18}$",
+                  "maxLength": 19
+                }
+              ]
+            },
+            "target_screen_token": {
+              "anyOf": [
+                {
+                  "type": "null"
+                },
+                {
+                  "type": "string",
+                  "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+                }
+              ]
+            },
             "applied_at_us": {
               "anyOf": [
                 {
@@ -740,11 +829,101 @@
           "required": [
             "stage",
             "event_id",
+            "action_revision",
+            "target_screen_token",
             "applied_at_us",
             "covered_rects",
             "release_pending"
           ],
-          "additionalProperties": false
+          "additionalProperties": false,
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "stage": {
+                    "enum": [
+                      0
+                    ]
+                  }
+                }
+              },
+              "then": {
+                "properties": {
+                  "event_id": {
+                    "type": "null"
+                  },
+                  "action_revision": {
+                    "type": "null"
+                  },
+                  "target_screen_token": {
+                    "type": "null"
+                  },
+                  "applied_at_us": {
+                    "type": "null"
+                  },
+                  "covered_rects": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "x": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 16384
+                        },
+                        "y": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 16384
+                        },
+                        "width": {
+                          "type": "integer",
+                          "minimum": 1,
+                          "maximum": 16384
+                        },
+                        "height": {
+                          "type": "integer",
+                          "minimum": 1,
+                          "maximum": 16384
+                        }
+                      },
+                      "required": [
+                        "x",
+                        "y",
+                        "width",
+                        "height"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "minItems": 0,
+                    "maxItems": 0
+                  }
+                }
+              },
+              "else": {
+                "properties": {
+                  "event_id": {
+                    "type": "string",
+                    "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+                  },
+                  "action_revision": {
+                    "type": "string",
+                    "pattern": "^[1-9][0-9]{0,18}$",
+                    "maxLength": 19
+                  },
+                  "target_screen_token": {
+                    "type": "string",
+                    "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+                  },
+                  "applied_at_us": {
+                    "type": "string",
+                    "pattern": "^(0|[1-9][0-9]{0,18})$",
+                    "maxLength": 19
+                  }
+                }
+              }
+            }
+          ]
         },
         "health": {
           "type": "object",

@@ -40,9 +40,11 @@ class AgePolicy {
   // Invalid ages/revisions leave the last valid profile unchanged.
   bool set_profile(int age, std::int64_t revision);
   const std::optional<companion::AgeProfile>& profile() const { return profile_; }
-  AgeDecision evaluate(const AnalysisBatch& batch);
+  AgeDecision evaluate(const AnalysisBatch& batch, const std::string& episode_id = {},
+                       std::int64_t phone_now_us = -1);
   void executed(const std::string& event_id, const std::string& package, int stage, std::int64_t phone_time_us);
   void reset_evidence();
+  void reset_repetition() { events_.clear(); }
  private:
   struct Chain {
     std::deque<companion::Json> observations;

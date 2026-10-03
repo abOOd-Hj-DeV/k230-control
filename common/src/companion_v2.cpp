@@ -11,6 +11,20 @@
 #include <stdexcept>
 
 namespace k230::companion {
+CaptureClockVerifier::Status CaptureClockVerifier::observe(std::int64_t pts, std::int64_t now) {
+  if (status_ != Status::Pending) return status_;
+  if (started_ < 0 || pts < 0 || now < started_ || now-started_ > 3000000 || ++samples_ > 8 ||
+      (pts > now && pts-now > 50000) || (now >= pts && now-pts > kTtlUs) ||
+      (last_pts_ >= 0 && (pts <= last_pts_ || now <= last_receive_))) return status_ = Status::Rejected;
+  if (first_pts_ < 0) { first_pts_ = pts; first_receive_ = now; }
+  last_pts_ = pts; last_receive_ = now;
+  auto source_span = pts-first_pts_, receive_span = now-first_receive_;
+  if (samples_ >= 3 && source_span >= 1000000 && receive_span >= 1000000) {
+    if (std::abs(source_span-receive_span) > 100000) return status_ = Status::Rejected;
+    status_ = Status::Accepted;
+  }
+  return status_;
+}
 namespace {
 [[noreturn]] void fail(const char* code) { throw std::runtime_error(code); }
 void require(bool condition, const char* code = "bounds") { if (!condition) fail(code); }
@@ -202,7 +216,8 @@ void validate(const Json& j) {
   require(j.contains("session_id") && j.contains("seq") && j.contains("stream_id"), "malformed_json");
   id(j.at("session_id")); id(j.at("stream_id")); decimal(j.at("seq"), true);
   if (type == "bind") {
-    keys(j, {"v", "type", "session_id", "seq", "stream_id", "pts_clock", "capture"});
+    keys(j, {"v", "type", "session_id", "seq", "stream_id", "pts_clock", "capture_pts_us", "capture"});
+    if (!j.at("capture_pts_us").is_null()) decimal(j.at("capture_pts_us"));
     require(j.at("pts_clock") == "android_system_nano_time_us", "clock_unverified");
     const auto& c = j.at("capture"); keys(c, {"source", "display_id", "mirror", "custom_crop", "custom_rotation"});
     require(c.at("source") == "scrcpy-4.0-display", "invalid_transform"); integer(c.at("display_id"), 0, 0);
@@ -210,16 +225,25 @@ void validate(const Json& j) {
   } else if (type == "bound") {
     keys(j, {"v", "type", "session_id", "seq", "request_seq", "stream_id", "status", "error", "phone_time_us"});
     decimal(j.at("request_seq"), true); decimal(j.at("phone_time_us"));
-    oneof(j.at("status"), {"accepted", "rejected"}); error(j.at("error"));
-    require((j.at("status") == "accepted") == j.at("error").is_null());
+    oneof(j.at("status"), {"pending", "accepted", "rejected"}); error(j.at("error"));
+    require((j.at("status") != "rejected") == j.at("error").is_null());
   } else if (type == "state") {
     keys(j, {"v", "type", "session_id", "seq", "stream_id", "phone_time_us", "policy", "screen", "protection", "health"});
     decimal(j.at("phone_time_us")); policy(j.at("policy")); if (!j.at("screen").is_null()) screen(j.at("screen"));
-    const auto& p = j.at("protection"); keys(p, {"stage", "event_id", "applied_at_us", "covered_rects", "release_pending"});
+    const auto& p = j.at("protection"); keys(p, {"stage", "event_id", "action_revision", "target_screen_token", "applied_at_us", "covered_rects", "release_pending"});
     int stage = integer(p.at("stage"), 0, 3); nullable_id(p.at("event_id"));
     require((stage == 0) == p.at("event_id").is_null() && (stage == 0) == p.at("applied_at_us").is_null());
+    require((stage == 0) == p.at("action_revision").is_null() && (stage == 0) == p.at("target_screen_token").is_null());
+    if (stage) { decimal(p.at("action_revision"),true); id(p.at("target_screen_token")); }
     if (stage) decimal(p.at("applied_at_us"));
     rectangles(p.at("covered_rects")); boolean(p.at("release_pending"));
+    require(stage != 0 || p.at("covered_rects").empty());
+    require(stage != 1 || !p.at("covered_rects").empty());
+    if (!j.at("screen").is_null()) {
+      const auto& s = j.at("screen");
+      for (const auto& r : p.at("covered_rects")) require(inside(rect_from_json(r),s.at("width"),s.at("height")));
+      if (stage == 2) require(p.at("covered_rects") == Json::array({rect_json({0,0,s.at("width"),s.at("height")})}));
+    }
     const auto& h = j.at("health"); keys(h, {"accessibility", "keystore", "pairing", "outbox_count", "cloud"});
     boolean(h.at("accessibility")); oneof(h.at("keystore"), {"ready", "locked", "failed"});
     oneof(h.at("pairing"), {"paired", "unpaired", "revoked", "key_lost"}); integer(h.at("outbox_count"), 0, 10000);
@@ -251,6 +275,9 @@ void validate(const Json& j) {
     require(j.at("executed_action") == (actual == 0 ? "none" : actual == 1 ? "cover_region" : actual == 2 ? "calm_shield" : "home"));
     if (!j.at("executed_at_us").is_null()) decimal(j.at("executed_at_us"));
     require(actual == 0 || !j.at("executed_at_us").is_null()); rectangles(j.at("display_rects")); error(j.at("error"));
+    require(actual != 0 || j.at("executed_at_us").is_null());
+    require((actual != 1 && actual != 2) || !j.at("display_rects").empty());
+    require(actual <= requested);
     require(actual == 1 || actual == 2 || j.at("display_rects").empty());
     if (j.at("status") == "executed") require(actual == requested && j.at("error").is_null());
     if (j.at("status") == "pending") require(requested == 3 && (actual == 0 || actual == 2) && j.at("error").is_null());
@@ -309,6 +336,8 @@ std::vector<Rect> validate_decision(const Json& d, const Json& state, std::int64
   for (auto k : {"screen_token", "content_epoch", "package", "window_id"}) require(d.at(k) == s.at(k), "wrong_screen");
   require(d.at("policy") == state.at("policy"), "policy_mismatch");
   require(state.at("health").at("accessibility") == true, "permission_missing");
+  require(state.at("health").at("keystore") == "ready", "locked");
+  require(state.at("health").at("pairing") == "paired", "session_mismatch");
   auto pts = decimal(d.at("pts_us")), sampled = decimal(s.at("sampled_at_us"));
   require(pts <= now || pts - now <= 50000, "future_pts");
   require(now <= pts || now - pts <= kTtlUs, "stale"); require(now <= decimal(d.at("expires_at_us")), "stale");

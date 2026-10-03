@@ -67,6 +67,10 @@ bool ScrcpySession::start() {
   serial_ = device->serial;
   K230_LOG_INFO(kTag) << "using device " << serial_;
 
+  if (source_validator_ && !source_validator_(config_)) {
+    K230_LOG_ERROR(kTag) << "protection requires pinned scrcpy 4.0 source";
+    return false;
+  }
   if (!adb_.push(serial_, config_.server_jar, config_.remote_jar)) return false;
 
   const std::string remote = "localabstract:" + socket_name();

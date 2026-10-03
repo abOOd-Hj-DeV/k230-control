@@ -78,7 +78,7 @@ void CompanionDispatcher::loop() {
         auto seq = companion::decimal(message.at("seq"));
         if (seq <= last_receive_seq_) throw std::runtime_error("stale");
         last_receive_seq_ = seq;
-        if (message.at("type") == "bound") bound_ = message.at("status") == "accepted";
+        if (message.at("type") == "bound" && message.at("status") != "pending") bound_ = message.at("status") == "accepted";
         if (message.at("type") == "state") { state_ = message; state_at_ = std::chrono::steady_clock::now(); }
         receiver_(message);
       }
@@ -89,7 +89,8 @@ void CompanionDispatcher::loop() {
       auto seq = companion::decimal(message.at("seq"));
       if (seq <= last_send_seq_) { ++dropped_; continue; }
       if (message.at("type") == "bind") {
-        if (last_send_seq_ != 0) { ++dropped_; continue; } stream_ = message.at("stream_id");
+        if (bound_ || (!stream_.empty() && message.at("stream_id") != stream_) || seq > 9) { ++dropped_; continue; }
+        stream_ = message.at("stream_id");
       } else if (message.at("type") == "decision") {
         if (!bound_ || state_.is_null() || message.at("stream_id") != stream_) { ++dropped_; continue; }
         auto elapsed = std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::steady_clock::now()-state_at_).count();

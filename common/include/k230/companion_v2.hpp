@@ -11,6 +11,17 @@ using Json = nlohmann::json;
 constexpr std::size_t kMaxLine = 16384;
 constexpr std::int64_t kTtlUs = 750000;
 constexpr const char* kPolicyVersion = "age-10-15-v1";
+class CaptureClockVerifier {
+ public:
+  enum class Status { Pending, Accepted, Rejected };
+  explicit CaptureClockVerifier(std::int64_t started_at_us) : started_(started_at_us) {}
+  Status observe(std::int64_t capture_pts_us, std::int64_t phone_receive_us);
+  Status status() const { return status_; }
+ private:
+  std::int64_t started_, first_pts_ = -1, last_pts_ = -1, first_receive_ = -1, last_receive_ = -1;
+  unsigned samples_ = 0;
+  Status status_ = Status::Pending;
+};
 struct Rect {
   int x = 0, y = 0, width = 0, height = 0;
   bool operator==(const Rect& r) const {

@@ -147,6 +147,7 @@ void InspectorPipeline::handle(const MediaPacket& packet) {
     const std::int64_t now = now_us();
     for (auto& f : frames) {
       ++stats_.frames_decoded;
+      if (capture_pts_observer_) capture_pts_observer_(f.pts_us);
       if (vision_) vision_->submit(f);
       if (capture_) capture_->push_frame(f);
       sync_.push_video(std::move(f), now);

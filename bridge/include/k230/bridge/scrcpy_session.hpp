@@ -54,6 +54,7 @@ class ScrcpySession {
   ScrcpySession& operator=(const ScrcpySession&) = delete;
 
   void set_session_callback(SessionCallback cb) { on_session_ = std::move(cb); }
+  void set_source_validator(std::function<bool(const ScrcpyConfig&)> validator) { source_validator_ = std::move(validator); }
 
   // Push server, forward ports, start server, connect sockets, start threads.
   bool start();
@@ -81,6 +82,7 @@ class ScrcpySession {
   AdbController adb_;
   std::shared_ptr<ipc::PacketSink> sink_;
   SessionCallback on_session_;
+  std::function<bool(const ScrcpyConfig&)> source_validator_;
 
   std::string serial_;
   std::uint32_t scid_ = 0;

@@ -5,6 +5,7 @@
   "type": "bind",
   "seq": "1",
   "pts_clock": "android_system_nano_time_us",
+  "capture_pts_us": null,
   "capture": {
     "source": "scrcpy-4.0-display",
     "display_id": 0,

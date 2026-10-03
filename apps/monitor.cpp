@@ -28,6 +28,7 @@
 #include "k230/ipc/channel.hpp"
 #include "k230/log.hpp"
 #include "k230/recording.hpp"
+#include "protection_source.hpp"
 
 namespace {
 
@@ -64,7 +65,7 @@ void usage() {
       "  --layout-record FILE          record the independently framed layout stream\n"
       "  --ui-model PATH               Android UI YOLOv8 Nano ONNX + two NSFWJS workers, without Mentor\n"
       "  --protection-v2               opt-in parental policy; requires UI/NSFWJS and v2 native companion\n"
-      "  --verified-pts-clock          operator confirms device scrcpy PTS regression against phone nanoTime\n"
+      "  --verified-pts-clock          diagnostic operator assertion; native clock probes still required\n"
       "  --ui-confidence X             detector confidence threshold (default: 0.25)\n"
       "  --ui-iou X --ui-max-regions N  overlap threshold (0.7) and crop limit (8)\n"
       "  --ui-min-side N               minimum crop width AND height in decoded pixels (default: 64)\n"
@@ -88,9 +89,9 @@ int main(int argc, char** argv) {
     K230_LOG_ERROR("monitor") << "--protection-v2 requires a PC ONNX build; heuristic enforcement is forbidden";
     return 1;
 #else
-    if (!cli.has("ui-model") || !cli.has("nsfwjs-model") || !cli.has("verified-pts-clock") || cli.has("layout") ||
+    if (!cli.has("ui-model") || !cli.has("nsfwjs-model") || cli.has("layout") ||
         cli.has("warn") || cli.has("block") || cli.has("confirm") || cli.has("cooldown-ms")) {
-      K230_LOG_ERROR("monitor") << "v2 requires --ui-model --nsfwjs-model --verified-pts-clock; fixed age policy cannot use legacy tuning/layout";
+      K230_LOG_ERROR("monitor") << "v2 requires --ui-model --nsfwjs-model; fixed age policy cannot use legacy tuning/layout";
       return 1;
     }
 #endif
@@ -105,6 +106,10 @@ int main(int argc, char** argv) {
   scfg.video_codec = cli.get("video-codec", scfg.video_codec);
   scfg.audio_codec = cli.get("audio-codec", scfg.audio_codec);
   scfg.audio = !cli.has("no-audio");
+  if (cli.has("protection-v2") && !protection_source_verified(scfg)) {
+    K230_LOG_ERROR("monitor") << "protection requires pinned scrcpy 4.0 server SHA256";
+    return 1;
+  }
 
   inspector::PipelineConfig pcfg;
   pcfg.sync.audio_enabled = scfg.audio;
@@ -176,6 +181,7 @@ int main(int argc, char** argv) {
   }
 
   bridge::ScrcpySession session(scfg, adb, sink);
+  if (cli.has("protection-v2")) session.set_source_validator(protection_source_verified);
   if (!session.start()) return 1;
 
   inspector::InspectorPipeline pipeline(pcfg, packets, verdicts, inspector::make_default_video_decoder(),
@@ -186,6 +192,8 @@ int main(int argc, char** argv) {
   std::unique_ptr<bridge::CompanionDispatcher> companion;
   if (cli.has("protection-v2")) {
     protection = std::make_shared<inspector::ProtectionSession>(controls,cli.has("verified-pts-clock"));
+    pipeline.set_capture_pts_observer([protection](std::int64_t pts) { protection->observe_capture_pts(pts); });
+    if (cli.has("verified-pts-clock")) K230_LOG_INFO("protection-v2") << "operator clock assertion is diagnostic; native probes are authoritative";
     companion = std::make_unique<bridge::CompanionDispatcher>(bridge::CompanionConfig{},adb,session.device_serial(),controls,
       [protection](const auto& m) { protection->receive(m); },[protection] { protection->disconnected(); });
   }

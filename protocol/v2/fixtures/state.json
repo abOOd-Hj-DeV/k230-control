@@ -27,6 +27,8 @@
   "protection": {
     "stage": 0,
     "event_id": null,
+    "action_revision": null,
+    "target_screen_token": null,
     "applied_at_us": null,
     "covered_rects": [],
     "release_pending": false

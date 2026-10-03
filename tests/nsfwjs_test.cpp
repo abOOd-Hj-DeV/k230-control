@@ -166,6 +166,14 @@ TEST(NsfwjsPipeline, RequestedAnalyzerCannotFallBackToHeuristic) {
   EXPECT_EQ(verdicts->size(), 0u);
 }
 
+TEST(NsfwjsPipeline, CaptureClockObserverPreservesDecodedPtsBeforeInferenceOrSync) {
+  PipelineConfig config; config.sync.audio_enabled = false; config.allow_analyzer_fallback = false;
+  auto verdicts = std::make_shared<ipc::InProcessQueue<Verdict>>(8);
+  InspectorPipeline pipeline(config, packets(1), verdicts, std::make_unique<TestDecoder>(), std::make_unique<FailingAnalyzer>(true));
+  std::vector<std::int64_t> captured;
+  pipeline.set_capture_pts_observer([&](std::int64_t pts) { captured.push_back(pts); });
+  EXPECT_FALSE(pipeline.run()); EXPECT_EQ(captured,(std::vector<std::int64_t>{2300000}));
+}
 TEST(NsfwjsPipeline, InferenceFailureReturnsErrorWithoutSafeVerdict) {
   PipelineConfig config;
   config.sync.audio_enabled = false;
