@@ -2,7 +2,7 @@
 set -eu
 root=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
 binary=${K230_SERVER_BINARY:-"$root/bin/k230-server"}
-if [ ! -x "$binary" ]; then
+if [ -z "${K230_SERVER_BINARY:-}" ] && [ ! -x "$binary" ]; then
   binary="$root/build/apps/k230-server"
 fi
 adb=${ADB:-adb}

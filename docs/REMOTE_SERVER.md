@@ -77,6 +77,11 @@ sh tools/run_adb_server.sh --serial "$PHONE_HOST:$CONNECT_PORT" --max-fps 10
 هوية الشاشة، انتهاء القرار بعد 750ms وACK التنفيذ تبقى كما في المسار
 الأصلي. بطء الشبكة قد يجعل القرار قديماً فيُرفض؛ لا نخفف هذه الشروط.
 
+الصوت يستخدم `audio_source=playback` و`audio_dup=true` لإبقائه مسموعاً
+على الهاتف، وهذا المسار يحتاج Android 13 أو أحدث، وقد يمنع التطبيق
+المصدر التقاطه. على هاتف أقدم أو إذا فشل التقاط الصوت، أضف `--no-audio`
+لتشغيل الفيديو والتحليل والحجب فقط.
+
 ## الحدود والتفعيل
 
 - تشغيل التطبيق وحده لا يفعّل التصحيح اللاسلكي ولا يقترن بـADB تلقائياً.
@@ -103,3 +108,4 @@ sh tools/run_adb_server.sh --connect "$PHONE_HOST:$CONNECT_PORT" --max-fps 10
 مراجع الاتصال:
 https://developer.android.com/tools/adb
 https://github.com/Genymobile/scrcpy/blob/master/doc/connection.md
+https://github.com/Genymobile/scrcpy/blob/master/doc/audio.md
