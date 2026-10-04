@@ -24,6 +24,7 @@ class AdbController {
   explicit AdbController(std::string adb_path = "adb");
 
   bool available() const;
+  bool connect(const std::string& endpoint) const;
   std::vector<AdbDevice> devices() const;
   // First device in state "device", or the one matching `preferred_serial`.
   std::optional<AdbDevice> pick_device(const std::string& preferred_serial = "") const;

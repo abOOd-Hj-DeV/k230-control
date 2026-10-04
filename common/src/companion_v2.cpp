@@ -220,7 +220,7 @@ void validate(const Json& j) {
     if (!j.at("capture_pts_us").is_null()) decimal(j.at("capture_pts_us"));
     require(j.at("pts_clock") == "android_system_nano_time_us", "clock_unverified");
     const auto& c = j.at("capture"); keys(c, {"source", "display_id", "mirror", "custom_crop", "custom_rotation"});
-    require(c.at("source") == "scrcpy-4.0-display" || c.at("source") == "android-mediaprojection-display", "invalid_transform"); integer(c.at("display_id"), 0, 0);
+    require(c.at("source") == "scrcpy-4.0-display", "invalid_transform"); integer(c.at("display_id"), 0, 0);
     for (auto k : {"mirror", "custom_crop", "custom_rotation"}) { boolean(c.at(k)); require(c.at(k) == false, "invalid_transform"); }
   } else if (type == "bound") {
     keys(j, {"v", "type", "session_id", "seq", "request_seq", "stream_id", "status", "error", "phone_time_us"});

@@ -1,7 +1,7 @@
 {
   "contract": "mentor-parental-v2.0",
   "sha256": {
-    "companion.schema.json": "9f4e67e30092e6b4f039ccadf1c13c4667d444ba926fb7f292c6080cd468c4f0",
+    "companion.schema.json": "fc69f5c81f341642d776fe14acefc6593f671d4588c2d2fd2a078984ec1f4fe5",
     "fixtures/ack.json": "7c6fa217088b0edd2000846a609a924970c89256a1cc9d1743ba047253ba1e0d",
     "fixtures/bind.json": "6dea298b72c45cff23e204db0896c47891dd23eb19cbb34002d99bcc3f4e0e7a",
     "fixtures/bound.json": "508dd4faca9645fdb748e0e94c92aac1a8a369d9f50070ad015cf02b9bebeccb",

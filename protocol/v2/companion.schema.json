@@ -318,8 +318,7 @@
           "properties": {
             "source": {
               "enum": [
-                "scrcpy-4.0-display",
-                "android-mediaprojection-display"
+                "scrcpy-4.0-display"
               ]
             },
             "display_id": {
