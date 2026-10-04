@@ -51,10 +51,11 @@ class TeeSink final : public k230::ipc::PacketSink {
   std::unique_ptr<k230::RecordingWriter> recording_;
 };
 
-void usage() {
+void usage(const char* program) {
+  std::printf("%s [options]   (PC/server: phone over USB or authorized network ADB)\n", program);
   std::puts(
-      "k230-monitor [options]   (PC: phone over USB, both cores emulated)\n"
       "  --adb PATH --serial S --server-jar PATH\n"
+      "  --connect HOST:PORT           connect a previously paired network ADB device\n"
       "  --max-size N --max-fps N --bitrate N --video-codec h264|h265 --audio-codec raw|opus --no-audio\n"
       "  --record FILE                 also save the packet stream for `k230-inspector --replay`\n"
       "  --dump-dir DIR                PNGs up to 10 fps + continuous WAV segments, aligned by phone PTS\n"
@@ -80,7 +81,7 @@ int main(int argc, char** argv) {
   using namespace k230;
   Cli cli(argc, argv);
   if (cli.has("help")) {
-    usage();
+    usage(argv[0]);
     return 0;
   }
   if (cli.has("verbose")) log::threshold() = log::Level::Debug;
@@ -100,6 +101,14 @@ int main(int argc, char** argv) {
   bridge::ScrcpyConfig scfg;
   scfg.server_jar = cli.get("server-jar", scfg.server_jar);
   scfg.serial = cli.get("serial", "");
+  if (cli.has("connect")) {
+    const auto endpoint = cli.get("connect");
+    if (endpoint.empty() || (!scfg.serial.empty() && scfg.serial != endpoint)) {
+      K230_LOG_ERROR("monitor") << "--connect requires an endpoint matching --serial when supplied";
+      return 1;
+    }
+    scfg.serial = endpoint;
+  }
   scfg.max_size = static_cast<std::uint32_t>(cli.get_int("max-size", scfg.max_size));
   scfg.max_fps = static_cast<std::uint32_t>(cli.get_int("max-fps", scfg.max_fps));
   scfg.video_bit_rate = static_cast<std::uint32_t>(cli.get_int("bitrate", scfg.video_bit_rate));
@@ -177,6 +186,10 @@ int main(int argc, char** argv) {
   bridge::AdbController adb(cli.get("adb", "adb"));
   if (!adb.available()) {
     K230_LOG_ERROR("monitor") << "adb not found; install android platform-tools";
+    return 1;
+  }
+  if (cli.has("connect") && !adb.connect(scfg.serial)) {
+    K230_LOG_ERROR("monitor") << "network ADB device unavailable or unauthorized; verify pairing and private routing";
     return 1;
   }
 

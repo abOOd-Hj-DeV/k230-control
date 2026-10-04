@@ -25,6 +25,16 @@ bool AdbController::available() const {
   return run_command({adb_path_, "version"}, 5000).ok();
 }
 
+bool AdbController::connect(const std::string& endpoint) const {
+  if (endpoint.empty() || endpoint.front() == '-' || endpoint.size() > 512 ||
+      endpoint.find_first_of(" \t\r\n") != std::string::npos) return false;
+  if (!run_command({adb_path_, "connect", endpoint}, 15000).ok()) return false;
+  auto result = run_command({adb_path_, "-s", endpoint, "get-state"}, 5000);
+  std::istringstream output(result.output);
+  std::string state;
+  return result.ok() && (output >> state) && state == "device";
+}
+
 std::vector<AdbDevice> AdbController::parse_devices_output(const std::string& output) {
   std::vector<AdbDevice> devices;
   std::istringstream in(output);
