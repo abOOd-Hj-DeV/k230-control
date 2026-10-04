@@ -12,7 +12,8 @@ class ProtectionSession {
   struct Stats { std::uint64_t submitted = 0, executed = 0, failed = 0, unknown = 0, expired = 0, rejected = 0; };
   using Clock = std::function<std::chrono::steady_clock::time_point()>;
   ProtectionSession(std::shared_ptr<ipc::ControlSink> downstream, bool diagnostic_pts_clock_assertion,
-                    Clock clock = [] { return std::chrono::steady_clock::now(); });
+                    Clock clock = [] { return std::chrono::steady_clock::now(); },
+                    std::string capture_source = "scrcpy-4.0-display");
   void receive(const companion::Json& message);
   void disconnected();
   void observe_capture_pts(std::int64_t pts_us);
@@ -28,6 +29,7 @@ class ProtectionSession {
   bool send_bind(const companion::Json& capture_pts);
   std::shared_ptr<ipc::ControlSink> downstream_;
   Clock clock_;
+  std::string capture_source_;
   bool clock_verified_ = false, bound_ = false;
   std::string stream_id_, event_id_, event_screen_token_;
   std::string previous_session_, previous_boot_;

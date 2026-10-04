@@ -55,7 +55,7 @@ def message(name, **fields):
 
 
 HELLO = obj(v=enum(2), type=enum("hello"), session_id=UUID, phone_boot_id=UUID, versions=arr(enum(2), 1, 1), max_line_bytes=enum(16384), phone_time_us=DECIMAL, clock=enum("android_system_nano_time_us"), capabilities={**arr(enum("cover_region", "calm_shield", "home"), 0, 3), "uniqueItems": True}, policy=nullable(POLICY), screen=nullable(SCREEN))
-BIND = message("bind", pts_clock=enum("android_system_nano_time_us"), capture_pts_us=nullable(DECIMAL), capture=obj(source=enum("scrcpy-4.0-display"), display_id=enum(0), mirror=enum(False), custom_crop=enum(False), custom_rotation=enum(False)))
+BIND = message("bind", pts_clock=enum("android_system_nano_time_us"), capture_pts_us=nullable(DECIMAL), capture=obj(source=enum("scrcpy-4.0-display", "android-mediaprojection-display"), display_id=enum(0), mirror=enum(False), custom_crop=enum(False), custom_rotation=enum(False)))
 BOUND = message("bound", request_seq=POSITIVE, status=enum("pending", "accepted", "rejected"), error=nullable(enum(*ERRORS)), phone_time_us=DECIMAL)
 BOUND["allOf"] = [{"if": {"properties": {"status": enum("rejected")}}, "then": {"properties": {"error": enum(*ERRORS)}}, "else": {"properties": {"error": NULL}}}]
 STATE = message("state", phone_time_us=DECIMAL, policy=nullable(POLICY), screen=nullable(SCREEN), protection=obj(stage=integer(0, 3), event_id=nullable(UUID), action_revision=nullable(POSITIVE), target_screen_token=nullable(UUID), applied_at_us=nullable(DECIMAL), covered_rects=arr(RECT, 0, 8), release_pending=BOOL), health=obj(accessibility=BOOL, keystore=enum("ready", "locked", "failed"), pairing=enum("paired", "unpaired", "revoked", "key_lost"), outbox_count=integer(0, 10000), cloud=enum("online", "offline", "unconfigured", "auth_error")))

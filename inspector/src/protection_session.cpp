@@ -4,12 +4,14 @@
 
 namespace k230::inspector {
 using companion::Json;
-ProtectionSession::ProtectionSession(std::shared_ptr<ipc::ControlSink> downstream, bool, Clock clock)
-  : downstream_(std::move(downstream)), clock_(std::move(clock)), stream_id_(companion::uuid()) {}
+ProtectionSession::ProtectionSession(std::shared_ptr<ipc::ControlSink> downstream, bool, Clock clock,
+                                    std::string capture_source)
+  : downstream_(std::move(downstream)), clock_(std::move(clock)), capture_source_(std::move(capture_source)),
+    stream_id_(companion::uuid()) {}
 bool ProtectionSession::send_bind(const Json& capture_pts) {
   Json bind{{"v",2},{"type","bind"},{"session_id",hello_.at("session_id")},{"seq",std::to_string(++send_seq_)},
     {"stream_id",stream_id_},{"pts_clock","android_system_nano_time_us"},{"capture_pts_us",capture_pts},
-    {"capture",{{"source","scrcpy-4.0-display"},{"display_id",0},{"mirror",false},{"custom_crop",false},{"custom_rotation",false}}}};
+    {"capture",{{"source",capture_source_},{"display_id",0},{"mirror",false},{"custom_crop",false},{"custom_rotation",false}}}};
   bind_seq_ = send_seq_; return downstream_->push(std::move(bind));
 }
 void ProtectionSession::observe_capture_pts(std::int64_t pts) {
