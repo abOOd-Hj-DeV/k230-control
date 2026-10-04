@@ -56,7 +56,10 @@ u64be capture_pts_us; u32be width; u32be height; u64be content_epoch;
 ```
 
 The server returns transport heartbeat records (`type=3`, payload byte `1`)
-for native state updates. Capture uses the unmodified ImageReader timestamp,
+for native state updates. Type 4 reports complete/partial analysis of a frame;
+type 5 acknowledges consumption, limiting the Android sender to one in-flight
+frame so slow inference cannot accumulate old screen images in a send queue.
+These transport replies do not replace execution ACKs. Capture uses the unmodified ImageReader timestamp,
 at up to four frames per second. Screen identity, exact full-display geometry,
 age evidence, the 750 ms decision expiry, local clock regression, journal and
 execution ACK checks remain active. MediaProjection binding additionally

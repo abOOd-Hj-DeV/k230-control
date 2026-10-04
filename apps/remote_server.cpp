@@ -153,6 +153,10 @@ void session(int fd, SSL_CTX* tls, const std::string& token,
         }
       } else {
         require(record.type == 2 && record.bytes.size() > 60);
+        const auto consumed = [&] {
+          const std::array<std::uint8_t, 6> receipt{5, 0, 0, 0, 1, 1};
+          write_exact(ssl.get(), receipt.data(), receipt.size());
+        };
         const auto raw_pts = be(record.bytes.data(), 8);
         require(raw_pts <= static_cast<std::uint64_t>(INT64_MAX));
         const auto pts = static_cast<std::int64_t>(raw_pts);
@@ -160,14 +164,14 @@ void session(int fd, SSL_CTX* tls, const std::string& token,
         require(pts > last_pts && (last_pts < 0 || now - last_frame >= std::chrono::milliseconds(100)));
         last_pts = pts; last_frame = now;
         protection.observe_capture_pts(pts);
-        if (state.is_null() || state.at("screen").is_null()) continue;
+        if (state.is_null() || state.at("screen").is_null()) { consumed(); continue; }
         const auto& screen = state.at("screen");
         const auto epoch = be(record.bytes.data() + 16, 8);
         const std::string screen_token(record.bytes.begin() + 24, record.bytes.begin() + 60);
         if (screen_token != screen.at("screen_token") ||
             std::to_string(epoch) != screen.at("content_epoch") ||
             be(record.bytes.data() + 8, 4) != screen.at("width").get<unsigned>() ||
-            be(record.bytes.data() + 12, 4) != screen.at("height").get<unsigned>()) continue;
+            be(record.bytes.data() + 12, 4) != screen.at("height").get<unsigned>()) { consumed(); continue; }
         auto frame = decode_png(record);
         k230::inspector::AnalysisBatch batch;
         batch.pts_us = pts; batch.width = frame.width; batch.height = frame.height;
@@ -188,6 +192,7 @@ void session(int fd, SSL_CTX* tls, const std::string& token,
         const std::array<std::uint8_t, 6> analyzed{4, 0, 0, 0, 1, static_cast<std::uint8_t>(batch.complete ? 1 : 0)};
         protection.analyze(std::move(batch));
         write_exact(ssl.get(), analyzed.data(), analyzed.size());
+        consumed();
       }
     }
   } catch (const std::exception&) {

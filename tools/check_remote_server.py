@@ -191,6 +191,7 @@ def main():
                     command = json.loads(payload)
                     assert kind == 1 and command["capture_pts_us"] == str(pts)
                     bound(command, "accepted" if index == 2 else "pending")
+                    assert receive(sock) == (5, b"\x01")
                 seq += 1
                 state["seq"] = str(seq)
                 state["phone_time_us"] = str(clock())
@@ -208,6 +209,7 @@ def main():
                 send(sock, 2, header + image)
                 kind, payload = receive(sock)
                 assert kind == 4 and payload in (b"\0", b"\1")
+                assert receive(sock) == (5, b"\x01")
                 sock.sendall(struct.pack(">BI", 2, 8 * 1024 * 1024 + 1))
                 assert sock.recv(1) == b""
             print(
